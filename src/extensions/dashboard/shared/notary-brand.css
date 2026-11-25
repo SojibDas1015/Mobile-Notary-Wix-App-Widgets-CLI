@@ -286,37 +286,388 @@
   color: #6b5c7a;
 }
 
+.dmn-mobile-row-meta {
+  display: none;
+}
+
+.dmn-quick-approve-btn {
+  appearance: none;
+  border: 1px solid #065f46;
+  background: #059669;
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.dmn-quick-approve-btn:hover:not(:disabled) {
+  background: #047857;
+}
+
+.dmn-quick-approve-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 @media (max-width: 1080px) {
+  .dmn-shell {
+    height: auto;
+    min-height: 100vh;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .dmn-body {
+    overflow-x: hidden;
+    overflow-y: visible;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Override WDS Page 864px and Tabs 628px hardcoded min-widths so nothing overflows right */
+  .dmn-body [class*="page__page"],
+  .dmn-body [class*="page__scrollable-container"],
+  .dmn-body [class*="page__scrollable-inner"],
+  .dmn-body [class*="page__content-stretch-container"],
+  .dmn-body [class*="page__content-container"],
+  .dmn-body [class*="page__content-floating"],
+  .dmn-body [class*="page__content-horizontal-layout"],
+  .dmn-body [class*="page__page-header-container"],
+  .dmn-body [class*="page__tail"],
+  .dmn-body [data-hook="page"],
+  .dmn-body [data-hook="table"],
+  .dmn-body [data-hook="card"] {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .dmn-body [class*="tabs__items-container"],
+  .dmn-body [class*="tabs__container"],
+  .dmn-body [class*="CollectionToolbar"],
+  .dmn-body [class*="TableToolbar"],
+  .dmn-body [class*="horizontal-scroll"],
+  .dmn-body [class*="header-wrapper"] > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex-wrap: wrap !important;
+    box-sizing: border-box !important;
+  }
+
   .dmn-topbar {
-    padding: 16px 20px 0;
+    padding: 14px 16px 0;
   }
 
   .dmn-tab-guide {
-    padding: 10px 20px;
+    padding: 10px 16px;
   }
 
   .dmn-body [class*="page__content-horizontal-layout"] {
-    padding-left: 20px !important;
-    padding-right: 20px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
   }
 
   .dmn-nav-tabs {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
   }
 }
 
 @media (max-width: 960px) {
   .dmn-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .dmn-kpi-card {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .dmn-mobile-row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .dmn-responsive-table {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .dmn-responsive-table [class*="horizontal-scroll"],
+  .dmn-responsive-table [class*="table-container"] {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .dmn-responsive-table table {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  .dmn-responsive-table th,
+  .dmn-responsive-table td {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    vertical-align: top !important;
+  }
+
+  .dmn-table-2col th:first-child,
+  .dmn-table-2col td:first-child {
+    width: 48% !important;
+  }
+
+  .dmn-table-2col th:nth-child(2),
+  .dmn-table-2col td:nth-child(2) {
+    width: 52% !important;
+  }
+
+  .dmn-table-2col th:nth-child(n + 3),
+  .dmn-table-2col td:nth-child(n + 3) {
+    display: none !important;
+  }
+
+  .dmn-table-3col th:first-child,
+  .dmn-table-3col td:first-child {
+    width: 48px !important;
+  }
+
+  .dmn-table-3col th:nth-child(2),
+  .dmn-table-3col td:nth-child(2) {
+    width: calc(50% - 24px) !important;
+  }
+
+  .dmn-table-3col th:nth-child(3),
+  .dmn-table-3col td:nth-child(3) {
+    width: calc(50% - 24px) !important;
+  }
+
+  .dmn-table-3col th:nth-child(n + 4),
+  .dmn-table-3col td:nth-child(n + 4) {
+    display: none !important;
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  .dmn-shell {
+    --wds-card-content-paddings-horizontal: 14px;
+    --wds-card-content-paddings-vertical: 14px;
+    --wds-card-header-padding-horizontal: 14px;
+    --wds-card-header-padding-vertical: 12px;
+    --wds-page-header-padding-horizontal: 12px;
+    --wds-page-header-padding-horizontal-small: 12px;
+  }
+
+  .dmn-topbar {
+    padding: 10px 12px 10px;
+  }
+
+  .dmn-topbar-head {
+    padding-bottom: 10px;
+    gap: 8px;
+  }
+
+  .dmn-brand-title {
+    font-size: 15.5px;
+  }
+
+  .dmn-brand-sub,
+  .dmn-dispatch-pill,
+  .dmn-tab-guide,
+  .dmn-nav-tab-desc {
+    display: none !important;
+  }
+
   .dmn-nav-tabs {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .dmn-nav-tab {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  }
+
+  .dmn-nav-tab.is-active {
+    border-bottom: 1px solid #e6dcf0;
+  }
+
+  .dmn-nav-tab-top {
+    font-size: 12.5px;
+    gap: 6px;
+  }
+
+  .dmn-body [class*="page__content-horizontal-layout"] {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  .dmn-body [data-hook="page-header"] {
+    padding-top: 12px;
+    padding-bottom: 10px;
   }
 
   .dmn-kpi-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .dmn-kpi-card {
+    padding: 10px 12px;
+    gap: 4px;
+  }
+
+  .dmn-kpi-label {
+    font-size: 10px;
+  }
+
+  .dmn-kpi-value {
+    font-size: 18px;
+  }
+
+  .dmn-kpi-meta {
+    font-size: 11px;
+  }
+
+  /* Ensure table toolbars and filters align in a straight, full-width grid on phone screens */
+  .dmn-body [class*="page__sticky-header-background"] {
+    display: none !important;
+  }
+
+  .dmn-body [class*="page__content-container"] {
+    margin-top: 8px !important;
+  }
+
+  .dmn-body [data-hook="table-toolbar"],
+  .dmn-body [class*="table-toolbar"],
+  .dmn-body [class*="CollectionToolbar"][class*="__root"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    height: auto !important;
+    padding: 12px !important;
+  }
+
+  .dmn-body [class*="CollectionToolbar"][class*="__left"],
+  .dmn-body [class*="CollectionToolbar"][class*="__right"],
+  .dmn-body [class*="table-toolbar__item-group"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  .dmn-body [class*="table-toolbar__item"] {
+    margin-inline-start: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .dmn-body [class*="CollectionToolbar"][class*="__left"] > *,
+  .dmn-body [class*="CollectionToolbar"][class*="__left"] [class*="ViewsDropdown"],
+  .dmn-body [class*="CollectionToolbar"][class*="__left"] [data-hook*="dropdown"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .dmn-body [data-hook="horizontal-overflow-box"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .dmn-body [data-hook="horizontal-overflow-box"] > * {
+    margin-inline-start: 0 !important;
+    flex: 1 1 calc(50% - 4px) !important;
+    min-width: 130px !important;
+    max-width: 100% !important;
+  }
+
+  .dmn-body [data-hook="horizontal-overflow-box"] > * > * {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .dmn-body [class*="SearchOrCustomFilter"][class*="__search"],
+  .dmn-body [class*="SearchOrCustomFilter"][class*="__root"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+    margin-inline-start: 0 !important;
+  }
+
+  /* Stack all WDS 12-column <Layout> grids & <Cell> items (including EntityPage/SettingsPage 2-column layouts and all form fields) into 100% single column on mobile */
+  .dmn-body [class*="-layout"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dmn-body [class*="-layout"] > * {
+    grid-column: 1 / -1 !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Stack Card.Header title and suffix action buttons vertically so buttons never overlap or crush card titles */
+  .dmn-body [class*="-card-header"] {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .dmn-body [class*="-card-header__suffix"] {
+    height: auto !important;
+    align-self: flex-start !important;
+    width: 100% !important;
+    flex-wrap: wrap !important;
+  }
+
+  /* Wrap Page.Header title and action buttons cleanly on narrow screens */
+  .dmn-body [class*="page-header"] [class*="title"],
+  .dmn-body [class*="header-wrapper"] {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .dmn-body [class*="page-header"] [class*="actions"],
+  .dmn-body [class*="header-wrapper"] > div {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .dmn-inline-btn-box {
+    padding-top: 0 !important;
   }
 }

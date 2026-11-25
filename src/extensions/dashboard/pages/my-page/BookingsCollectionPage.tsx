@@ -17,7 +17,7 @@ import {
 } from '@wix/patterns';
 import { CollectionPage } from '@wix/patterns/page';
 import { usePatternsNavigate } from '@wix/patterns/router';
-import { fetchAllServicesList, fetchBookingsPage } from '../../cms/notary-cms-api';
+import { fetchAllServicesList, fetchBookingsPage, saveBooking } from '../../cms/notary-cms-api';
 import { NotaryOverviewStrip } from './NotaryOverviewStrip';
 import type { BookingRecord, ServiceRecord } from '../../cms/types';
 import {
@@ -49,6 +49,26 @@ export const BookingsCollectionPage = () => {
   const { navigateToEntityPage } = usePatternsNavigate<BookingRecord>();
   const { errorHandler } = useWixPatternsContainer();
   const [services, setServices] = useState<ServiceRecord[]>([]);
+  const [approvedIds, setApprovedIds] = useState<Record<string, boolean>>({});
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+
+  const handleQuickApprove = async (e: React.MouseEvent, item: BookingRecord) => {
+    e.stopPropagation();
+    if (approvingId) return;
+    setApprovingId(item._id);
+    try {
+      await saveBooking({
+        ...item,
+        status: 'Confirmed',
+      });
+      setApprovedIds((prev) => ({ ...prev, [item._id]: true }));
+    } catch {
+      // Fall back to opening the entity page if quick save fails.
+      navigateToEntityPage({ path: `/bookings/${item._id}`, entity: item });
+    } finally {
+      setApprovingId(null);
+    }
+  };
 
   useEffect(() => {
     fetchAllServicesList()
@@ -132,8 +152,9 @@ export const BookingsCollectionPage = () => {
       <CollectionPage.Content>
         <Box direction="vertical" gap="SP2" width="100%">
           <NotaryOverviewStrip />
-          <Table
-          state={state}
+          <div className="dmn-responsive-table dmn-table-2col">
+            <Table
+              state={state}
           horizontalScroll
           search={<CollectionSearch placeholder="Search ref, client, address, or service" />}
           tabs={
@@ -198,7 +219,7 @@ export const BookingsCollectionPage = () => {
             {
               id: 'bookingRef',
               title: 'Reference',
-              width: '140px',
+              width: '150px',
               render: (item) => (
                 <Box direction="vertical" gap="3px">
                   <Text size="small" weight="bold">
@@ -207,6 +228,12 @@ export const BookingsCollectionPage = () => {
                   <Text size="tiny" secondary>
                     {TYPE_LABELS[item.bookingType] ?? item.bookingType}
                   </Text>
+                  <div className="dmn-mobile-row-meta">
+                    <Text size="tiny">
+                      {item.serviceName || item.serviceId || 'Service'} ·{' '}
+                      {item.appointmentDate || 'TBD'} {item.appointmentTime || ''}
+                    </Text>
+                  </div>
                 </Box>
               ),
               mobile: { column: 'first', order: 1 },
@@ -215,16 +242,45 @@ export const BookingsCollectionPage = () => {
               id: 'client',
               title: 'Client',
               width: '210px',
-              render: (item) => (
-                <Box direction="vertical" gap="3px">
-                  <Text size="small" weight="normal">
-                    {item.clientName || 'Unnamed client'}
-                  </Text>
-                  <Text size="tiny" secondary>
-                    {item.clientPhone || item.clientEmail || 'No contact'}
-                  </Text>
-                </Box>
-              ),
+              render: (item) => {
+                const effectiveStatus = approvedIds[item._id] ? 'Confirmed' : item.status;
+                const isPending =
+                  effectiveStatus === 'Pending Approval' ||
+                  effectiveStatus === 'Pending Quote Approval';
+                return (
+                  <Box direction="vertical" gap="3px">
+                    <Text size="small" weight="normal">
+                      {item.clientName || 'Unnamed client'}
+                    </Text>
+                    <Text size="tiny" secondary>
+                      {item.clientPhone || item.clientEmail || 'No contact'}
+                    </Text>
+                    <div className="dmn-mobile-row-meta">
+                      <Text size="tiny" weight="bold">
+                        {item.bookingType === 'quote' && !item.grandTotal
+                          ? 'Quote TBD'
+                          : formatCurrency(item.grandTotal)}
+                      </Text>
+                      <Badge
+                        size="tiny"
+                        skin={BOOKING_STATUS_SKIN[effectiveStatus] ?? 'neutral'}
+                      >
+                        {effectiveStatus}
+                      </Badge>
+                      {isPending && (
+                        <button
+                          type="button"
+                          className="dmn-quick-approve-btn"
+                          disabled={approvingId === item._id}
+                          onClick={(e) => void handleQuickApprove(e, item)}
+                        >
+                          {approvingId === item._id ? 'Approving...' : '✓ Approve'}
+                        </button>
+                      )}
+                    </div>
+                  </Box>
+                );
+              },
               mobile: { column: 'second' },
             },
             {
@@ -267,19 +323,38 @@ export const BookingsCollectionPage = () => {
             },
             {
               id: 'status',
-              title: 'Status',
-              width: '180px',
-              render: (item) => (
-                <Badge
-                  size="small"
-                  skin={BOOKING_STATUS_SKIN[item.status] ?? 'neutral'}
-                >
-                  {item.status}
-                </Badge>
-              ),
+              title: 'Status & Action',
+              width: '220px',
+              render: (item) => {
+                const effectiveStatus = approvedIds[item._id] ? 'Confirmed' : item.status;
+                const isPending =
+                  effectiveStatus === 'Pending Approval' ||
+                  effectiveStatus === 'Pending Quote Approval';
+                return (
+                  <Box gap="SP1" verticalAlign="middle">
+                    <Badge
+                      size="small"
+                      skin={BOOKING_STATUS_SKIN[effectiveStatus] ?? 'neutral'}
+                    >
+                      {effectiveStatus}
+                    </Badge>
+                    {isPending && (
+                      <button
+                        type="button"
+                        className="dmn-quick-approve-btn"
+                        disabled={approvingId === item._id}
+                        onClick={(e) => void handleQuickApprove(e, item)}
+                      >
+                        {approvingId === item._id ? 'Approving...' : '✓ Approve'}
+                      </button>
+                    )}
+                  </Box>
+                );
+              },
             },
           ]}
         />
+          </div>
         </Box>
       </CollectionPage.Content>
     </CollectionPage>

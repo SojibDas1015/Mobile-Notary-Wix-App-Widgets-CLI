@@ -30,9 +30,6 @@ class NotaryBookingWidget extends DirectNotaryBooking {
   }
 
   override connectedCallback(): void {
-    super.connectedCallback();
-    this._syncEditorHeadings();
-
     if (!this._bridgeBound) {
       this._bridgeBound = true;
       this.addEventListener('requestRetryConfig', () => {
@@ -50,8 +47,18 @@ class NotaryBookingWidget extends DirectNotaryBooking {
         const detail = (evt as CustomEvent<Record<string, unknown>>).detail || {};
         void this._handleBookingSubmit(detail);
       });
+      this.addEventListener('requestStripeCheckout', (evt: Event) => {
+        const detail = (evt as CustomEvent<Record<string, unknown>>).detail || {};
+        void this._handleStripeCheckout(detail);
+      });
+      this.addEventListener('requestStripeComplete', (evt: Event) => {
+        const detail = (evt as CustomEvent<Record<string, unknown>>).detail || {};
+        void this._handleStripeComplete(detail);
+      });
     }
 
+    super.connectedCallback();
+    this._syncEditorHeadings();
     void this._fetchLiveConfig();
   }
 
@@ -244,6 +251,58 @@ class NotaryBookingWidget extends DirectNotaryBooking {
       this.setAttribute(
         'submission-status',
         JSON.stringify({ success: false, error: msg, _ts: Date.now() }),
+      );
+    }
+  }
+
+  private async _handleStripeCheckout(payload: Record<string, unknown>): Promise<void> {
+    try {
+      const { data: result } = await this._fetchJson<Record<string, unknown>>(
+        '/stripe-checkout',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'create', ...payload }),
+        },
+      );
+      this.setAttribute(
+        'stripe-checkout-result',
+        JSON.stringify({ ...result, _ts: Date.now() }),
+      );
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unable to start Stripe Checkout.';
+      this.setAttribute(
+        'stripe-checkout-result',
+        JSON.stringify({ success: false, error: msg, _ts: Date.now() }),
+      );
+    }
+  }
+
+  private _stripeCompleteInProgress = false;
+
+  private async _handleStripeComplete(payload: Record<string, unknown>): Promise<void> {
+    if (this._stripeCompleteInProgress) return;
+    this._stripeCompleteInProgress = true;
+    try {
+      const { data: result } = await this._fetchJson<Record<string, unknown>>(
+        '/stripe-checkout',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'complete', ...payload }),
+        },
+      );
+      this._stripeCompleteInProgress = false;
+      this.setAttribute(
+        'submission-status',
+        JSON.stringify({ ...result, stripeCompleted: true, _ts: Date.now() }),
+      );
+    } catch (error) {
+      this._stripeCompleteInProgress = false;
+      const msg = error instanceof Error ? error.message : 'Unable to verify Stripe payment.';
+      this.setAttribute(
+        'submission-status',
+        JSON.stringify({ success: false, stripeCompleted: true, error: msg, _ts: Date.now() }),
       );
     }
   }

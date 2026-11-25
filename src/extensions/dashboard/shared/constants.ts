@@ -1,9 +1,10 @@
 import type { BadgeProps } from '@wix/design-system';
-import type { FeeType, PricingModel, QuestionInputType } from '../cms/types';
+import type { FeeType, PaymentPolicy, PricingModel, QuestionInputType } from '../cms/types';
 
 export const CONFIRM_DELETE_MODAL_ID = '2164c0c3-22c7-4007-a2cb-7c4b8862460c';
 
 export const BOOKING_STATUS_OPTIONS = [
+  { id: 'Pending Approval', value: 'Pending Approval' },
   { id: 'Confirmed', value: 'Confirmed' },
   { id: 'Pending Quote Approval', value: 'Pending Quote Approval' },
   { id: 'Quote Sent', value: 'Quote Sent' },
@@ -12,6 +13,7 @@ export const BOOKING_STATUS_OPTIONS = [
 ] as const;
 
 export const BOOKING_STATUS_SKIN: Record<string, BadgeProps['skin']> = {
+  'Pending Approval': 'warning',
   Confirmed: 'success',
   'Pending Quote Approval': 'warning',
   'Quote Sent': 'standard',
@@ -34,6 +36,22 @@ export const PRICING_MODEL_LABELS: Record<PricingModel, string> = {
   per_signature: 'Per Signature',
   flat: 'Flat Fee',
   quote_only: 'Quote Only',
+};
+
+export const PAYMENT_POLICY_OPTIONS: Array<{ id: PaymentPolicy; value: string }> = [
+  { id: 'optional_online', value: 'Customer Choice (Pay Online via Stripe or At Appointment)' },
+  { id: 'full_advance', value: 'Full Payment Required in Advance (Stripe)' },
+  { id: 'deposit_fixed', value: 'Fixed Dollar Deposit Required in Advance (Stripe)' },
+  { id: 'deposit_percent', value: 'Percentage Deposit Required in Advance (Stripe)' },
+  { id: 'pay_at_appointment', value: 'Pay at Appointment Only (No Online Charge)' },
+];
+
+export const PAYMENT_POLICY_LABELS: Record<PaymentPolicy, string> = {
+  optional_online: 'Stripe Optional / At Appt',
+  full_advance: '100% Advance (Stripe)',
+  deposit_fixed: 'Fixed Deposit (Stripe)',
+  deposit_percent: '% Deposit (Stripe)',
+  pay_at_appointment: 'Pay at Appointment',
 };
 
 export const FEE_TYPE_OPTIONS: Array<{ id: FeeType; value: string }> = [

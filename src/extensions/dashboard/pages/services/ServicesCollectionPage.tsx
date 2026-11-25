@@ -18,7 +18,7 @@ import { CollectionPage } from '@wix/patterns/page';
 import { usePatternsNavigate } from '@wix/patterns/router';
 import { fetchServicesPage } from '../../cms/notary-cms-api';
 import type { PricingModel, ServiceRecord } from '../../cms/types';
-import { formatCurrency, PRICING_MODEL_LABELS } from '../../shared/constants';
+import { formatCurrency, PAYMENT_POLICY_LABELS, PRICING_MODEL_LABELS } from '../../shared/constants';
 
 const activeFilter = stringsArrayFilter<'active' | 'inactive'>({
   name: 'ServiceStatus',
@@ -78,8 +78,9 @@ export const ServicesCollectionPage = () => {
         primaryAction={<PrimaryActions label="Add service" onClick={openNew} />}
       />
       <CollectionPage.Content>
-        <Table
-          state={state}
+        <div className="dmn-responsive-table dmn-table-3col">
+          <Table
+            state={state}
           horizontalScroll
           search={<CollectionSearch placeholder="Search services by name, ID, or badge" />}
           filters={
@@ -145,7 +146,7 @@ export const ServicesCollectionPage = () => {
               width: '260px',
               render: (item) => (
                 <Box direction="vertical" gap="3px">
-                  <Box gap="SP1" verticalAlign="middle">
+                  <Box gap="SP1" verticalAlign="middle" flexWrap="wrap">
                     <Text size="small" weight="bold">
                       {item.title}
                     </Text>
@@ -174,8 +175,15 @@ export const ServicesCollectionPage = () => {
                   <Text size="tiny" secondary>
                     {item.isQuoteOnly || item.pricingModel === 'quote_only'
                       ? 'Custom quote flow'
-                      : `${formatCurrency(item.basePrice)} base`}
+                      : `${formatCurrency(item.basePrice)} base · ${
+                          PAYMENT_POLICY_LABELS[item.paymentPolicy ?? 'full_advance'] ?? 'Stripe'
+                        }`}
                   </Text>
+                  <div className="dmn-mobile-row-meta">
+                    <Badge size="tiny" skin={item.active ? 'success' : 'neutral'}>
+                      {item.active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
                 </Box>
               ),
               mobile: { column: 'second' },
@@ -205,6 +213,7 @@ export const ServicesCollectionPage = () => {
             },
           ]}
         />
+        </div>
       </CollectionPage.Content>
     </CollectionPage>
   );

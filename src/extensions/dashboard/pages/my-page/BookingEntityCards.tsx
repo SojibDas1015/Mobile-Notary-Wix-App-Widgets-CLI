@@ -546,22 +546,45 @@ export const PricingBreakdownCard = () => {
     control: page.form.control,
     defaultValue: page.entity?.grandTotal ?? 0,
   });
+  const paymentStatusCtrl = useController({
+    name: 'paymentStatus',
+    control: page.form.control,
+    defaultValue: page.entity?.paymentStatus ?? '',
+  });
+  const amountPaidCtrl = useController({
+    name: 'amountPaid',
+    control: page.form.control,
+    defaultValue: page.entity?.amountPaid ?? 0,
+  });
+  const balanceDueCtrl = useController({
+    name: 'balanceDue',
+    control: page.form.control,
+    defaultValue: page.entity?.balanceDue ?? 0,
+  });
 
   const handleSum = () => {
     const sum =
       Number(serviceFeeCtrl.field.value ?? 0) +
       Number(travelFeeCtrl.field.value ?? 0) +
       Number(addonsFeeCtrl.field.value ?? 0);
-    grandTotalCtrl.field.onChange(Number(sum.toFixed(2)));
+    const total = Number(sum.toFixed(2));
+    grandTotalCtrl.field.onChange(total);
+    const dep = Number((total * 0.5).toFixed(2));
+    const bal = Number(Math.max(0, total - dep).toFixed(2));
+    amountPaidCtrl.field.onChange(dep);
+    balanceDueCtrl.field.onChange(bal);
+    if (!paymentStatusCtrl.field.value || paymentStatusCtrl.field.value === 'Quote Review') {
+      paymentStatusCtrl.field.onChange('50% Deposit Required');
+    }
   };
 
   return (
     <>
       <Card.Header
-        title="Pricing & Quote Total"
+        title="Pricing & 50% Deposit Breakdown"
         suffix={
           <Button size="small" priority="secondary" onClick={handleSum}>
-            Recalculate Total
+            Recalculate Total &amp; 50% Deposit
           </Button>
         }
       />
@@ -603,6 +626,34 @@ export const PricingBreakdownCard = () => {
           <Text size="small" secondary>
             Displayed total: {formatCurrency(grandTotalCtrl.field.value)}
           </Text>
+          <FormField label="Payment Status">
+            <Input
+              value={paymentStatusCtrl.field.value}
+              onChange={paymentStatusCtrl.field.onChange}
+              placeholder="Paid / Deposit Paid / Pay at Appointment"
+            />
+          </FormField>
+          <FormField label="Amount Paid Online ($)">
+            <NumberInput
+              min={0}
+              step={1}
+              value={amountPaidCtrl.field.value}
+              onChange={(v) => amountPaidCtrl.field.onChange(v ?? 0)}
+            />
+          </FormField>
+          <FormField label="Balance Due at Appointment ($)">
+            <NumberInput
+              min={0}
+              step={1}
+              value={balanceDueCtrl.field.value}
+              onChange={(v) => balanceDueCtrl.field.onChange(v ?? 0)}
+            />
+          </FormField>
+          {page.entity?.stripeSessionId ? (
+            <Text size="tiny" secondary>
+              Stripe Session: {page.entity.stripeSessionId}
+            </Text>
+          ) : null}
         </Box>
       </Card.Content>
     </>

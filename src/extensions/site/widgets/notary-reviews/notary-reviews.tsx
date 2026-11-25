@@ -101,9 +101,6 @@ class NotaryReviewsWidget extends HTMLElement {
   }
 
   private _render(): void {
-    const badge =
-      this.getAttribute('heading-badge') ||
-      'Direct Mobile Notary & Verification Services LLC';
     const title =
       this.getAttribute('heading-title') ||
       'Trusted by Clients Across Greater Charlotte';
@@ -114,15 +111,6 @@ class NotaryReviewsWidget extends HTMLElement {
     const maxLimit = Number.isFinite(maxAttr) && maxAttr > 0 ? maxAttr : this._reviews.length;
     const visibleReviews = this._reviews.slice(0, maxLimit);
     const ctaHref = safeHref(this._googleReviewLink);
-
-    const summaryHtml =
-      this._totalApproved > 0
-        ? `<div class="dmn-rev-summary">
-            <span class="dmn-rev-stars">${starString(Math.round(this._averageRating))}</span>
-            <strong>${this._averageRating.toFixed(1)}</strong>
-            <span>(${this._totalApproved} verified ${this._totalApproved === 1 ? 'review' : 'reviews'})</span>
-          </div>`
-        : '';
 
     let bodyHtml = '';
     if (this._loading) {
@@ -168,7 +156,11 @@ class NotaryReviewsWidget extends HTMLElement {
     const ctaHtml = ctaHref
       ? `<div class="dmn-rev-cta-row">
           <a class="dmn-rev-cta" href="${escapeHtml(ctaHref)}" target="_blank" rel="noopener noreferrer">
-            Read or Leave a Review on Google
+            <span>Read or Leave a Review on Google</span>
+            <svg class="dmn-rev-cta-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" fill="#ffffff" />
+              <path d="M8 12h7M12 8.5L15.5 12 12 15.5" fill="none" stroke="#4b247a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
           </a>
         </div>`
       : '';
@@ -343,27 +335,34 @@ class NotaryReviewsWidget extends HTMLElement {
           text-align: center;
         }
         .dmn-rev-cta {
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
           background: #4b247a;
           color: #ffffff;
           text-decoration: none;
-          font-size: 13px;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          padding: 12px 24px;
+          font-size: 13.5px;
+          font-weight: 600;
+          letter-spacing: 0.01em;
+          padding: 11px 22px;
           border: 1px solid #4b247a;
+          border-radius: 6px;
+          transition: background 0.18s ease, border-color 0.18s ease;
         }
         .dmn-rev-cta:hover {
           background: #36185b;
+          border-color: #36185b;
+        }
+        .dmn-rev-cta-icon {
+          flex-shrink: 0;
+          display: block;
         }
       </style>
       <section class="dmn-rev-wrap">
         <header class="dmn-rev-header">
-          <div class="dmn-rev-badge">${escapeHtml(badge)}</div>
           <h2 class="dmn-rev-title">${escapeHtml(title)}</h2>
           <p class="dmn-rev-sub">${escapeHtml(subtitle)}</p>
-          ${summaryHtml}
         </header>
         ${bodyHtml}
         ${ctaHtml}

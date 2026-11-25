@@ -117,8 +117,9 @@ export const AddonsCollectionPage = () => {
         primaryAction={<PrimaryActions label="Add add-on" onClick={openNew} />}
       />
       <CollectionPage.Content>
-        <Table
-          state={state}
+        <div className="dmn-responsive-table dmn-table-2col">
+          <Table
+            state={state}
           horizontalScroll
           search={<CollectionSearch placeholder="Search add-on label, key, or service" />}
           filters={
@@ -192,7 +193,17 @@ export const AddonsCollectionPage = () => {
               title: 'Service Scope',
               width: '190px',
               render: (item) => (
-                <Text size="small">{serviceNameById[item.serviceId] ?? item.serviceId}</Text>
+                <Box direction="vertical" gap="3px">
+                  <Text size="small">{serviceNameById[item.serviceId] ?? item.serviceId}</Text>
+                  <div className="dmn-mobile-row-meta">
+                    <Text size="tiny" weight="bold">
+                      {formatCurrency(item.feeAmount)} ({FEE_TYPE_LABELS[item.feeType] ?? item.feeType})
+                    </Text>
+                    <Badge size="tiny" skin={item.active ? 'success' : 'neutral'}>
+                      {item.active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                </Box>
               ),
               mobile: { column: 'second' },
             },
@@ -229,6 +240,7 @@ export const AddonsCollectionPage = () => {
             },
           ]}
         />
+        </div>
       </CollectionPage.Content>
     </CollectionPage>
   );

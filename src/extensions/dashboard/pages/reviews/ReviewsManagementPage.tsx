@@ -260,7 +260,7 @@ export const ReviewsManagementPage = () => {
         title="Customer Reviews & Google Business Profile Sync"
         subtitle="Sync reviews from your Google Business Profile via Google Places API and choose exactly which reviews appear on your website."
         actionsBar={
-          <Box gap="SP2">
+          <Box gap="SP2" flexWrap="wrap">
             <Button priority="secondary" onClick={() => setShowManualForm((v) => !v)}>
               {showManualForm ? 'Close Add Form' : '+ Add Client Testimonial'}
             </Button>
@@ -324,7 +324,7 @@ export const ReviewsManagementPage = () => {
                       </FormField>
                     </Cell>
                     <Cell span={2}>
-                      <Box paddingTop="22px">
+                      <Box paddingTop="22px" className="dmn-inline-btn-box">
                         <Button
                           fullWidth
                           priority="secondary"
@@ -346,7 +346,7 @@ export const ReviewsManagementPage = () => {
                       </FormField>
                     </Cell>
                     <Cell span={3}>
-                      <Box paddingTop="22px">
+                      <Box paddingTop="22px" className="dmn-inline-btn-box">
                         <Button
                           fullWidth
                           priority="secondary"
@@ -466,7 +466,7 @@ export const ReviewsManagementPage = () => {
                   title={`Review Approval Queue (${reviews.length} total)`}
                   subtitle="Only reviews toggled ON (Approved) appear inside the Customer Reviews widget on your live website."
                   suffix={
-                    <Box gap="SP1">
+                    <Box gap="SP1" flexWrap="wrap">
                       <Button
                         size="small"
                         priority={filterMode === 'all' ? 'primary' : 'secondary'}
@@ -510,10 +510,11 @@ export const ReviewsManagementPage = () => {
                           backgroundColor={rev.approved ? '#faf8fd' : '#ffffff'}
                           align="space-between"
                           verticalAlign="top"
-                          gap="SP4"
+                          gap="SP3"
+                          flexWrap="wrap"
                         >
-                          <Box direction="vertical" gap="SP1" style={{ flex: 1 }}>
-                            <Box verticalAlign="middle" gap="SP2">
+                          <Box direction="vertical" gap="SP1" style={{ flex: '1 1 220px', minWidth: 0 }}>
+                            <Box verticalAlign="middle" gap="SP2" flexWrap="wrap">
                               <Text weight="bold">{rev.reviewerName}</Text>
                               <Text size="small" style={{ color: '#d97706', fontWeight: 700 }}>
                                 {renderStars(rev.rating)} ({rev.rating}/5)
@@ -535,7 +536,7 @@ export const ReviewsManagementPage = () => {
                             </Text>
                           </Box>
 
-                          <Box direction="vertical" align="right" gap="SP2" style={{ minWidth: '170px' }}>
+                          <Box direction="vertical" align="left" gap="SP2">
                             <Box verticalAlign="middle" gap="SP2">
                               <Text size="tiny" weight="bold">
                                 {rev.approved ? 'Show on Site' : 'Hidden'}

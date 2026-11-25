@@ -107,6 +107,16 @@ export const DispatchOriginCard = () => {
     control: page.form.control,
     defaultValue: Boolean(page.settings?.owner.enableRonService),
   });
+  const ipenCtrl = useController({
+    name: 'owner.enableIpenService',
+    control: page.form.control,
+    defaultValue: Boolean(page.settings?.owner.enableIpenService),
+  });
+  const depositPctCtrl = useController({
+    name: 'owner.defaultDepositPercent',
+    control: page.form.control,
+    defaultValue: page.settings?.owner.defaultDepositPercent ?? 50,
+  });
 
   return (
     <SettingsPage.Card>
@@ -196,10 +206,40 @@ export const DispatchOriginCard = () => {
             </FormField>
           </Cell>
           <Cell span={6}>
-            <FormField label="Remote Online Notarization (RON)" labelPlacement="right">
+            <FormField
+              label="Required Appointment Deposit (%)"
+              infoContent="Percentage of total approved service cost (including travel & add-ons) required to secure an appointment. Default: 50%."
+            >
+              <NumberInput
+                min={0}
+                max={100}
+                step={5}
+                value={depositPctCtrl.field.value}
+                onChange={(v) => depositPctCtrl.field.onChange(v ?? 50)}
+              />
+            </FormField>
+          </Cell>
+          <Cell span={6}>
+            <FormField
+              label="Remote Online Notarization (RON)"
+              infoContent="Keep OFF until activated in the future. Turning ON automatically adds RON to public booking services."
+              labelPlacement="right"
+            >
               <ToggleSwitch
                 checked={Boolean(ronCtrl.field.value)}
                 onChange={(e) => ronCtrl.field.onChange(e.target.checked)}
+              />
+            </FormField>
+          </Cell>
+          <Cell span={6}>
+            <FormField
+              label="In-Person Electronic Notarization (IPEN)"
+              infoContent="Keep OFF until activated in the future. Turning ON automatically adds IPEN to public booking services."
+              labelPlacement="right"
+            >
+              <ToggleSwitch
+                checked={Boolean(ipenCtrl.field.value)}
+                onChange={(e) => ipenCtrl.field.onChange(e.target.checked)}
               />
             </FormField>
           </Cell>
@@ -226,6 +266,13 @@ export const BusinessIdentityCard = () => {
     control: page.form.control,
     defaultValue: page.settings?.owner.receiptDisclaimer ?? '',
   });
+  const depositPolicyCtrl = useController({
+    name: 'owner.depositPolicyText',
+    control: page.form.control,
+    defaultValue:
+      page.settings?.owner.depositPolicyText ??
+      'A 50% non-refundable deposit is required to secure and officially confirm your appointment (subject to North Carolina notary fee regulations) and is applied directly toward your total service cost. The remaining 50% balance is due at the time of service. Deposits are non-refundable for customer cancellations or no-shows where legally permitted. If Direct Mobile Notary & Verification Services cancels the appointment, your deposit will be refunded in full.',
+  });
   const [secretStatus, setSecretStatus] = useState<SecretStatusResult | null>(null);
   const [checkingSecrets, setCheckingSecrets] = useState(false);
 
@@ -238,6 +285,7 @@ export const BusinessIdentityCard = () => {
       setSecretStatus({
         hasPlacesKey: false,
         hasRoutesKey: false,
+        hasStripeKey: false,
         secretError: err instanceof Error ? err.message : 'Unable to query Wix Secrets Manager',
       });
     } finally {
@@ -286,6 +334,18 @@ export const BusinessIdentityCard = () => {
             </FormField>
           </Cell>
           <Cell span={12}>
+            <FormField
+              label="Non-Refundable Deposit, Cancellation & Refund Policy"
+              infoContent="Displayed on the booking payment step and confirmation receipts."
+            >
+              <InputArea
+                rows={3}
+                value={depositPolicyCtrl.field.value}
+                onChange={depositPolicyCtrl.field.onChange}
+              />
+            </FormField>
+          </Cell>
+          <Cell span={12}>
             <Box
               direction="vertical"
               gap="SP2"
@@ -295,13 +355,13 @@ export const BusinessIdentityCard = () => {
               borderTop="3px solid #4B247A"
               borderRadius="0px"
             >
-              <Box align="space-between" verticalAlign="middle" gap="SP2">
-                <Box direction="vertical" gap="2px">
+              <Box align="space-between" verticalAlign="middle" gap="SP2" flexWrap="wrap">
+                <Box direction="vertical" gap="2px" style={{ flex: '1 1 200px', minWidth: 0 }}>
                   <Text size="small" weight="bold">
                     Wix Secrets Manager Integration
                   </Text>
                   <Text size="tiny" secondary>
-                    Backend endpoints read GOOGLE_PLACES_API_KEY and GOOGLE_ROUTES_API_KEY directly from Site Secrets Manager.
+                    Backend endpoints read GOOGLE_PLACES_API_KEY, GOOGLE_ROUTES_API_KEY, and STRIPE_SECRET_KEY directly from Site Secrets Manager.
                   </Text>
                 </Box>
                 <Button
@@ -344,9 +404,26 @@ export const BusinessIdentityCard = () => {
                         : 'Checking...'}
                   </Badge>
                 </Box>
+                <Box gap="6px" verticalAlign="middle">
+                  <Text size="tiny" weight="bold">
+                    STRIPE_SECRET_KEY:
+                  </Text>
+                  <Badge
+                    size="small"
+                    skin={secretStatus?.hasStripeKey ? 'success' : 'warning'}
+                  >
+                    {secretStatus?.hasStripeKey
+                      ? 'Connected'
+                      : secretStatus
+                        ? 'Not Accessible'
+                        : 'Checking...'}
+                  </Badge>
+                </Box>
               </Box>
               {secretStatus?.secretError &&
-                (!secretStatus.hasPlacesKey || !secretStatus.hasRoutesKey) && (
+                (!secretStatus.hasPlacesKey ||
+                  !secretStatus.hasRoutesKey ||
+                  !secretStatus.hasStripeKey) && (
                   <Text size="tiny" skin="error">
                     {secretStatus.secretError.includes('403')
                       ? 'Wix Secrets Manager returned 403 Permission Denied. In Wix Dev Center -> App -> Permissions, enable "Manage Secrets", save, and accept the updated permissions on this site.'

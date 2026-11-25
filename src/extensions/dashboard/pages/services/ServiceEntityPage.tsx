@@ -22,8 +22,8 @@ import {
 import { useController, useForm } from '@wix/patterns/form';
 import { ControlledImageInput } from '@wix/patterns-fields';
 import { fetchService, removeService, saveService } from '../../cms/notary-cms-api';
-import type { PricingModel, ServiceRecord } from '../../cms/types';
-import { PRICING_MODEL_OPTIONS } from '../../shared/constants';
+import type { PaymentPolicy, PricingModel, ServiceRecord } from '../../cms/types';
+import { PAYMENT_POLICY_OPTIONS, PRICING_MODEL_OPTIONS } from '../../shared/constants';
 
 type ServiceFormFields = Omit<ServiceRecord, '_id'>;
 
@@ -135,6 +135,16 @@ const ServiceMainFields = ({ isNew }: { isNew: boolean }) => {
     control: page.form.control,
     defaultValue: Boolean(page.entity?.isQuoteOnly),
   });
+  const paymentPolicyCtrl = useController({
+    name: 'paymentPolicy',
+    control: page.form.control,
+    defaultValue: page.entity?.paymentPolicy ?? 'full_advance',
+  });
+  const depositAmountCtrl = useController({
+    name: 'depositAmount',
+    control: page.form.control,
+    defaultValue: page.entity?.depositAmount ?? 0,
+  });
   const popularCtrl = useController({
     name: 'popularLabel',
     control: page.form.control,
@@ -200,6 +210,46 @@ const ServiceMainFields = ({ isNew }: { isNew: boolean }) => {
             step={5}
             value={priceCtrl.field.value}
             onChange={(v) => priceCtrl.field.onChange(v ?? 0)}
+          />
+        </FormField>
+      </Cell>
+      <Cell span={6}>
+        <FormField
+          label="Online Payment Policy (Stripe)"
+          infoContent="Choose whether customers can pay online in advance, pay a deposit, or pay at the appointment for this service."
+        >
+          <Dropdown
+            disabled={Boolean(quoteCtrl.field.value) || modelCtrl.field.value === 'quote_only'}
+            selectedId={
+              quoteCtrl.field.value || modelCtrl.field.value === 'quote_only'
+                ? 'pay_at_appointment'
+                : paymentPolicyCtrl.field.value ?? 'full_advance'
+            }
+            options={PAYMENT_POLICY_OPTIONS}
+            onSelect={(opt) => paymentPolicyCtrl.field.onChange(String(opt.id) as PaymentPolicy)}
+          />
+        </FormField>
+      </Cell>
+      <Cell span={6}>
+        <FormField
+          label={
+            paymentPolicyCtrl.field.value === 'deposit_percent'
+              ? 'Deposit Percentage (%)'
+              : 'Deposit Amount ($)'
+          }
+          infoContent="Used when Payment Policy is set to Fixed Dollar Deposit or Percentage Deposit."
+        >
+          <NumberInput
+            min={0}
+            max={paymentPolicyCtrl.field.value === 'deposit_percent' ? 100 : undefined}
+            step={paymentPolicyCtrl.field.value === 'deposit_percent' ? 5 : 5}
+            disabled={
+              Boolean(quoteCtrl.field.value) ||
+              (paymentPolicyCtrl.field.value !== 'deposit_fixed' &&
+                paymentPolicyCtrl.field.value !== 'deposit_percent')
+            }
+            value={depositAmountCtrl.field.value ?? 0}
+            onChange={(v) => depositAmountCtrl.field.onChange(v ?? 0)}
           />
         </FormField>
       </Cell>

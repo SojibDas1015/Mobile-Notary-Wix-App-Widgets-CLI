@@ -11,7 +11,7 @@
 
 class DirectNotaryBooking extends HTMLElement {
   static get observedAttributes() {
-    return ['widget-mode', 'submission-status', 'site-config', 'site-config-error', 'distance-result', 'file-upload-result'];
+    return ['widget-mode', 'submission-status', 'site-config', 'site-config-error', 'distance-result', 'file-upload-result', 'stripe-checkout-result'];
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -67,6 +67,16 @@ class DirectNotaryBooking extends HTMLElement {
         }
       } catch (err) {
         console.warn('[Custom Element] Invalid file-upload-result JSON:', err);
+      }
+    }
+    if (name === 'stripe-checkout-result' && newValue) {
+      try {
+        const parsed = JSON.parse(newValue);
+        if (typeof this._onStripeCheckoutResult === 'function') {
+          this._onStripeCheckoutResult(parsed);
+        }
+      } catch (err) {
+        console.warn('[Custom Element] Invalid stripe-checkout-result JSON:', err);
       }
     }
   }
@@ -1100,43 +1110,65 @@ class DirectNotaryBooking extends HTMLElement {
           background: #ffffff;
           padding: 18px 36px 24px;
           display: flex;
-          align-items: center;
+          align-items: stretch;
           justify-content: space-between;
-          border-top: none !important;
+          gap: 16px;
+          border-top: 1px solid #f0eaf5;
+          margin-top: auto;
+          box-sizing: border-box;
+          width: 100%;
         }
         :is(notary-booking, notary-quote) .primary-btn {
           background: var(--purple);
           color: #ffffff;
           border: 1px solid var(--purple);
-          padding: 13px 28px;
+          padding: 12px 24px;
           font-size: 14.5px;
           font-weight: 700;
-          min-width: 190px;
+          min-height: 48px;
+          line-height: 1.35;
+          margin-left: auto;
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          text-align: center;
           gap: 8px;
+          box-sizing: border-box;
+          cursor: pointer;
+          transition: background 0.15s ease, border-color 0.15s ease;
         }
         :is(notary-booking, notary-quote) .primary-btn:hover {
           background: var(--purple-dark);
+          border-color: var(--purple-dark);
         }
         :is(notary-booking, notary-quote) .back-btn {
           border: 1px solid #d5ccd9;
           background: #ffffff;
           color: #4f4752;
-          padding: 12px 20px;
+          padding: 12px 22px;
           font-weight: 700;
           font-size: 14px;
-          visibility: hidden;
+          min-height: 48px;
+          line-height: 1.35;
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 6px;
+          box-sizing: border-box;
+          cursor: pointer;
+          transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        :is(notary-booking, notary-quote) .back-btn:not(.show) {
+          display: none !important;
         }
         :is(notary-booking, notary-quote) .back-btn:hover {
           background: #f9f6fc;
           border-color: #beb2c5;
         }
-        :is(notary-booking, notary-quote) .back-btn.show { visibility: visible; }
+        :is(notary-booking, notary-quote) .back-btn.show {
+          display: inline-flex !important;
+          visibility: visible !important;
+        }
 
         /* Step 6 Review Box */
         :is(notary-booking, notary-quote) .review-card {
@@ -1198,15 +1230,116 @@ class DirectNotaryBooking extends HTMLElement {
           place-items: center;
           margin: 0 auto 18px;
         }
+        :is(notary-booking, notary-quote) .confirm-badges-row {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          margin: 18px auto 22px;
+          flex-wrap: wrap;
+        }
         :is(notary-booking, notary-quote) .confirm-badge {
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           background: var(--purple-light);
           border: 1px solid var(--purple-border);
           color: var(--purple);
-          font-size: 14.5px;
+          font-size: 14px;
           font-weight: 800;
-          padding: 7px 18px;
-          margin-bottom: 16px;
+          padding: 0 20px;
+          min-height: 42px;
+          height: 42px;
+          line-height: 1;
+          margin: 0;
+          box-sizing: border-box;
+          letter-spacing: 0.03em;
+          vertical-align: middle;
+        }
+        :is(notary-booking, notary-quote) .confirm-payment-pill {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #ecfdf5;
+          border: 1px solid #a7f3d0;
+          color: #065f46;
+          font-size: 13.5px;
+          font-weight: 700;
+          padding: 0 18px;
+          min-height: 42px;
+          height: 42px;
+          line-height: 1;
+          margin: 0;
+          box-sizing: border-box;
+          vertical-align: middle;
+        }
+        :is(notary-booking, notary-quote) .payment-box {
+          margin-top: 18px;
+          border: 1px solid #d4c7e2;
+          border-top: 3px solid var(--purple);
+          background: #fff;
+          padding: 16px 18px;
+        }
+        :is(notary-booking, notary-quote) .payment-box-title {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 10px;
+          flex-wrap: wrap;
+        }
+        :is(notary-booking, notary-quote) .payment-box-title b {
+          font-size: 14px;
+          color: var(--purple);
+        }
+        :is(notary-booking, notary-quote) .stripe-pill {
+          font-size: 11px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          padding: 3px 9px;
+          background: #eef2ff;
+          color: #3730a3;
+          border: 1px solid #c7d2fe;
+        }
+        :is(notary-booking, notary-quote) .payment-choices {
+          display: grid;
+          gap: 10px;
+          margin-top: 8px;
+        }
+        :is(notary-booking, notary-quote) .payment-choice-card {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 12px 14px;
+          border: 1px solid #dfd8e5;
+          background: #fcfbfe;
+          cursor: pointer;
+        }
+        :is(notary-booking, notary-quote) .payment-choice-card.is-active {
+          border-color: var(--purple);
+          background: #f6f1fb;
+        }
+        :is(notary-booking, notary-quote) .payment-choice-card input {
+          margin-top: 3px;
+          accent-color: var(--purple);
+        }
+        :is(notary-booking, notary-quote) .payment-due-row {
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 1px dashed #e2d8ea;
+          display: flex;
+          justify-content: space-between;
+          font-size: 13.5px;
+          color: #332938;
+        }
+        :is(notary-booking, notary-quote) .stripe-redirect-notice {
+          margin-top: 12px;
+          padding: 12px 14px;
+          background: #eef2ff;
+          border: 1px solid #c7d2fe;
+          color: #1e1b4b;
+          font-size: 13.5px;
         }
 
         /* Side Rail Summary */
@@ -1293,14 +1426,19 @@ class DirectNotaryBooking extends HTMLElement {
         :is(notary-booking, notary-quote) .field textarea { min-width: 0; max-width: 100%; width: 100%; box-sizing: border-box; }
         :is(notary-booking, notary-quote) .field label { overflow-wrap: anywhere; }
 
+        /* Comprehensive Responsive & Mobile-First Overrides */
         @media (max-width: 1180px) {
-          :is(notary-booking, notary-quote) .booking-grid { grid-template-columns: minmax(0, 1fr) !important; }
+          :is(notary-booking, notary-quote) .booking-grid {
+            grid-template-columns: 1fr !important;
+            gap: 24px !important;
+          }
+          :is(notary-booking, notary-quote) .side-rail {
+            position: static !important;
+            order: 2 !important;
+          }
         }
-        @media (max-width: 680px) {
-          :is(notary-booking, notary-quote) .two-col-grid { grid-template-columns: minmax(0, 1fr) !important; }
-        }
+
         @media (max-width: 980px) {
-          :is(notary-booking, notary-quote) .booking-grid { grid-template-columns: 1fr; }
           :is(notary-booking, notary-quote) .service-list { grid-template-columns: 1fr; }
           :is(notary-booking, notary-quote) .address-grid { grid-template-columns: 1fr; }
           :is(notary-booking, notary-quote) .two-col-grid { grid-template-columns: 1fr; }
@@ -1308,8 +1446,175 @@ class DirectNotaryBooking extends HTMLElement {
           :is(notary-booking, notary-quote) .quote-windows-grid { grid-template-columns: 1fr; }
           :is(notary-booking, notary-quote) .task-body { padding: 24px 20px; }
           :is(notary-booking, notary-quote) .task-head { padding: 20px 20px 16px; }
-          :is(notary-booking, notary-quote) .action-bar { padding: 14px 20px; }
+          :is(notary-booking, notary-quote) .action-bar { padding: 16px 20px; }
           :is(notary-booking, notary-quote) .journey-text { display: none; }
+        }
+
+        @media (max-width: 768px) {
+          :is(notary-booking, notary-quote) .shell {
+            padding: 0 12px !important;
+          }
+          :is(notary-booking, notary-quote) .booking-section {
+            padding: 16px 0 36px !important;
+          }
+          :is(notary-booking, notary-quote) .booking-intro {
+            margin-bottom: 20px !important;
+          }
+          :is(notary-booking, notary-quote) .booking-intro h2 {
+            font-size: 24px !important;
+          }
+          :is(notary-booking, notary-quote) .booking-intro p {
+            font-size: 14px !important;
+          }
+          :is(notary-booking, notary-quote) .task-card {
+            min-height: auto !important;
+          }
+          :is(notary-booking, notary-quote) .field input,
+          :is(notary-booking, notary-quote) .field select,
+          :is(notary-booking, notary-quote) .field textarea,
+          :is(notary-booking, notary-quote) .cms-question-field input,
+          :is(notary-booking, notary-quote) .cms-question-field select,
+          :is(notary-booking, notary-quote) .cms-question-field textarea,
+          :is(notary-booking, notary-quote) .big-input input {
+            font-size: 16px !important; /* Prevents unwanted auto-zoom on iOS */
+          }
+        }
+
+        @media (max-width: 600px) {
+          :is(notary-booking, notary-quote) .journey {
+            padding: 12px 14px !important;
+            margin-bottom: 16px !important;
+          }
+          :is(notary-booking, notary-quote) .journey-top {
+            margin-bottom: 10px !important;
+            padding-bottom: 8px !important;
+          }
+          :is(notary-booking, notary-quote) .journey-top b {
+            font-size: 13px !important;
+          }
+          :is(notary-booking, notary-quote) .journey-status {
+            font-size: 11px !important;
+            padding: 2px 8px !important;
+          }
+          :is(notary-booking, notary-quote) .journey-dot {
+            width: 26px !important;
+            height: 26px !important;
+            font-size: 11px !important;
+          }
+          :is(notary-booking, notary-quote) .journey-line {
+            margin: 0 4px !important;
+          }
+          :is(notary-booking, notary-quote) .task-head {
+            padding: 16px 14px 12px !important;
+          }
+          :is(notary-booking, notary-quote) .task-head h2 {
+            font-size: 19px !important;
+          }
+          :is(notary-booking, notary-quote) .task-body {
+            padding: 16px 14px !important;
+          }
+          :is(notary-booking, notary-quote) .action-bar {
+            flex-direction: column-reverse !important;
+            padding: 14px 14px 18px !important;
+            gap: 10px !important;
+          }
+          :is(notary-booking, notary-quote) .primary-btn {
+            width: 100% !important;
+            min-width: 0 !important;
+            min-height: 52px !important;
+            font-size: 15px !important;
+            margin-left: 0 !important;
+            padding: 14px 16px !important;
+            white-space: normal !important;
+          }
+          :is(notary-booking, notary-quote) .back-btn {
+            width: 100% !important;
+            min-width: 0 !important;
+            min-height: 44px !important;
+            font-size: 14px !important;
+            padding: 10px 16px !important;
+          }
+          :is(notary-booking, notary-quote) .service-option {
+            grid-template-columns: 56px 1fr !important;
+            gap: 12px !important;
+            padding: 12px !important;
+          }
+          :is(notary-booking, notary-quote) .service-thumb {
+            width: 56px !important;
+            height: 56px !important;
+          }
+          :is(notary-booking, notary-quote) .service-copy b {
+            font-size: 14.5px !important;
+          }
+          :is(notary-booking, notary-quote) .service-copy span {
+            font-size: 12px !important;
+          }
+          :is(notary-booking, notary-quote) .location-search-row {
+            flex-direction: column !important;
+            gap: 8px !important;
+          }
+          :is(notary-booking, notary-quote) .btn-calc-route {
+            width: 100% !important;
+            min-height: 48px !important;
+            padding: 12px !important;
+          }
+          :is(notary-booking, notary-quote) .address-grid {
+            grid-template-columns: 1fr !important;
+            gap: 10px !important;
+          }
+          :is(notary-booking, notary-quote) .two-col-grid {
+            grid-template-columns: 1fr !important;
+          }
+          :is(notary-booking, notary-quote) .cms-questions-grid {
+            grid-template-columns: 1fr !important;
+            gap: 14px !important;
+          }
+          :is(notary-booking, notary-quote) .time-slots-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+          }
+          :is(notary-booking, notary-quote) .time-slot-btn {
+            padding: 10px 6px !important;
+            font-size: 13px !important;
+          }
+          :is(notary-booking, notary-quote) .quote-windows-grid {
+            grid-template-columns: 1fr !important;
+            gap: 8px !important;
+          }
+          :is(notary-booking, notary-quote) .review-card {
+            padding: 16px 14px !important;
+          }
+          :is(notary-booking, notary-quote) .review-row {
+            font-size: 13px !important;
+            padding: 8px 0 !important;
+          }
+          :is(notary-booking, notary-quote) .payment-box {
+            padding: 14px 12px !important;
+          }
+          :is(notary-booking, notary-quote) .payment-box-title {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 6px !important;
+          }
+          :is(notary-booking, notary-quote) .payment-due-row {
+            font-size: 12.5px !important;
+          }
+          :is(notary-booking, notary-quote) .summary-card {
+            padding: 16px 14px !important;
+          }
+          :is(notary-booking, notary-quote) .summary-head {
+            margin: -16px -14px 14px !important;
+            padding: 12px 14px !important;
+          }
+          :is(notary-booking, notary-quote) #confirmActionButtons {
+            flex-direction: column !important;
+            width: 100% !important;
+            gap: 10px !important;
+          }
+          :is(notary-booking, notary-quote) #confirmActionButtons > * {
+            width: 100% !important;
+            justify-content: center !important;
+          }
         }
 
         @keyframes dmnLoaderRotate {
@@ -1584,9 +1889,11 @@ class DirectNotaryBooking extends HTMLElement {
                         <strong id="revTotal">Calculated at Review</strong>
                       </div>
                     </div>
+                    <div id="paymentSelectionBox" class="payment-box" style="display:none"></div>
+                    <div id="stripeRedirectBox" class="stripe-redirect-notice" style="display:none"></div>
                     <label style="display:flex;align-items:flex-start;gap:12px;font-size:13px;color:#332938;margin-top:16px;cursor:pointer;background:#faf6fd;padding:12px 14px;border:1px solid #d4c7e2">
                       <input type="checkbox" id="chkFeeAgreement" style="margin-top:3px;accent-color:var(--purple);width:16px;height:16px;flex-shrink:0" />
-                      <span><strong>Travel &amp; Fee Disclosure Agreement:</strong> I have reviewed and agree to the separately itemized travel fee, notarial service charges, and any selected add-on or witness coordination fees prior to my appointment.</span>
+                      <span><strong>Deposit, Travel Fee, Cancellation, Rescheduling &amp; Refund Policy Agreement:</strong> I have reviewed and agree to the separately itemized statutory notarial service charges, optional add-ons, and travel fee pursuant to North Carolina Notary regulations. I acknowledge that a 50% non-refundable deposit (applied directly toward the total cost, with the remaining 50% due at the time of service) is required to officially confirm my appointment, and that deposits are non-refundable for customer cancellations or no-shows where legally permitted (and refunded in full if Direct Mobile Notary &amp; Verification Services cancels the appointment).</span>
                     </label>
                   </div>
 
@@ -1596,17 +1903,27 @@ class DirectNotaryBooking extends HTMLElement {
                       <div class="confirm-icon">
                         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                       </div>
-                      <h2 id="confirmHeadingTitle" style="color:var(--purple);margin:0 0 6px">Booking Request Submitted!</h2>
-                      <div class="confirm-badge">Reference ID: <strong id="confirmRefId">DMN-XXXX</strong></div>
-                      <p id="confirmHeadingDesc" style="color:var(--muted);margin:0 0 20px;font-size:15px">Thank you! Your mobile appointment details have been received. Lakechia Sanders will review and contact you promptly.</p>
+                      <h2 id="confirmHeadingTitle" style="color:var(--purple);margin:0 0 16px;line-height:1.25">Booking Request Submitted!</h2>
+                      <div class="confirm-badges-row" style="display:flex;align-items:center;justify-content:center;gap:12px;margin:18px auto 22px;flex-wrap:wrap">
+                        <div class="confirm-badge" style="margin:0;display:inline-flex;align-items:center;justify-content:center;min-height:42px;height:42px;box-sizing:border-box">Reference ID: <strong id="confirmRefId" style="margin-left:5px">DMN-XXXX</strong></div>
+                        <div id="confirmPaymentSummary" class="confirm-payment-pill" style="display:none;margin:0;min-height:42px;height:42px;box-sizing:border-box"></div>
+                      </div>
+                      <p id="confirmHeadingDesc" style="color:var(--muted);margin:0 0 22px;font-size:15px;line-height:1.55">Thank you! Your mobile appointment details have been received. Lakechia Sanders will review and contact you promptly.</p>
                       
-                      <div style="display:flex;justify-content:center;gap:12px;margin-top:24px;flex-wrap:wrap">
-                        <button type="button" class="primary-btn" id="btnBookAnotherDirect" style="min-width:180px">Book Another Service</button>
-                        <button type="button" class="back-btn show" id="btnPrintReceiptDirect" style="visibility:visible">
+                      <div id="confirmVerifyingSpinner" style="display:none;margin:24px auto 14px;text-align:center">
+                        <div class="dmn-spin" style="display:inline-block;width:38px;height:38px;border:3px solid #eedbf7;border-top:3px solid var(--purple);border-radius:50%"></div>
+                        <div style="font-weight:700;font-size:15px;color:var(--purple);margin-top:12px">Verifying payment with Stripe...</div>
+                        <div style="font-size:13px;color:var(--muted);margin-top:4px">Please wait a few seconds while we confirm your appointment and generate your receipt.</div>
+                        <button type="button" id="btnRetryStripeVerify" style="display:none;margin:16px auto 0;padding:10px 22px;background:var(--purple);color:#ffffff;border:none;font-weight:700;font-size:13.5px;cursor:pointer">Verify Now</button>
+                      </div>
+
+                      <div id="confirmActionButtons" style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:26px;flex-wrap:wrap">
+                        <button type="button" class="primary-btn" id="btnBookAnotherDirect" style="min-width:180px;min-height:48px;height:48px;margin:0">Book Another Service</button>
+                        <button type="button" class="back-btn show" id="btnPrintReceiptDirect" style="visibility:visible;min-height:48px;height:48px;margin:0">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                           Print Confirmation Receipt
                         </button>
-                        <a id="confirmCallLink" href="tel:8034120170" style="display:inline-flex;align-items:center;gap:6px;padding:12px 20px;border:1px solid #d5ccd9;background:#fff;color:var(--purple);font-weight:700;text-decoration:none">
+                        <a id="confirmCallLink" href="tel:8034120170" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 20px;min-height:48px;height:48px;border:1px solid #d5ccd9;background:#fff;color:var(--purple);font-weight:700;font-size:14px;text-decoration:none;box-sizing:border-box;margin:0">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
                           <span id="confirmCallLabel">Call Notary (803) 412-0170</span>
                         </a>
@@ -1717,11 +2034,16 @@ class DirectNotaryBooking extends HTMLElement {
 
     const todayStr = new Date().toISOString().split('T')[0];
 
+    const earlySearch = getCurrentUrlSearch();
+    const earlyParams = earlySearch ? new URLSearchParams(earlySearch) : null;
+    const initialStripeSession = earlyParams ? earlyParams.get('dmn_stripe_session') : null;
+    const initialStripeRef = earlyParams ? (earlyParams.get('dmn_ref') || '') : '';
+
     const state = {
-      step: 1,
+      step: initialStripeSession ? 7 : 1,
       cmsStatus: 'loading',
       cmsError: '',
-      isSubmitting: false,
+      isSubmitting: Boolean(initialStripeSession),
       service: '',
       signers: 1,
       signatures: 1,
@@ -1743,14 +2065,41 @@ class DirectNotaryBooking extends HTMLElement {
       addonsFee: 0,
       addonsSummary: 'None',
       addonsList: [],
+      addonItems: [],
       totalFee: 0,
       path: 'instant',
       destCoords: null,
       placesApiKey: '',
+      stripeEnabled: false,
+      paymentChoice: 'stripe',
+      paymentStatus: '',
+      amountPaid: 0,
+      balanceDue: 0,
+      paymentPreferenceText: '',
+      lockRestoredTotals: false,
       appointmentDate: todayStr,
       appointmentTime: '',
       quoteWindow: 'Afternoon (12 PM – 4 PM)'
     };
+
+    if (initialStripeSession) {
+      $$('.task-view').forEach(v => {
+        const isStep7 = (Number(v.dataset.step) === 7);
+        v.style.display = isStep7 ? 'block' : 'none';
+        v.classList.toggle('active', isStep7);
+      });
+      if ($('#confirmHeadingTitle')) $('#confirmHeadingTitle').textContent = 'Verifying Your Stripe Payment...';
+      if ($('#confirmHeadingDesc')) $('#confirmHeadingDesc').textContent = 'Please wait a moment while we verify your 50% deposit and confirm your appointment...';
+      if ($('#confirmRefId') && initialStripeRef) $('#confirmRefId').textContent = initialStripeRef;
+      if ($('#confirmVerifyingSpinner')) $('#confirmVerifyingSpinner').style.display = 'block';
+      if ($('#confirmActionButtons')) $('#confirmActionButtons').style.display = 'none';
+      if ($('#confirmPaymentSummary')) $('#confirmPaymentSummary').style.display = 'none';
+      if ($('#bookingActionBar')) $('#bookingActionBar').style.display = 'none';
+      if ($('#stepCount')) $('#stepCount').textContent = 'Payment Verification';
+      if ($('#taskTitle')) $('#taskTitle').textContent = 'Verifying Your Payment...';
+      if ($('#taskIntro')) $('#taskIntro').textContent = 'Please wait while we verify your deposit and confirm your appointment.';
+      if ($('#journeyStatus')) $('#journeyStatus').textContent = 'Verifying Stripe Payment...';
+    }
 
     let mapInstance = null;
     let markerDest = null;
@@ -1790,11 +2139,389 @@ class DirectNotaryBooking extends HTMLElement {
         basePrice: 0,
         pricingModel: 'flat',
         isQuoteOnly: false,
+        paymentPolicy: 'full_advance',
+        depositAmount: 0,
         mode: 'instant',
         popularLabel: '',
         hiddenByDefault: false,
         img: ''
       };
+    }
+
+    function computePaymentBreakdown() {
+      const total = Math.round(Math.max(0, Number(state.totalFee || 0)) * 100) / 100;
+      const defaultPct = Math.max(0, Math.min(100, Number(state.defaultDepositPercent || 50)));
+      if (state.path === 'quote' || !state.stripeEnabled) {
+        const quoteDep = Math.round(((total * defaultPct) / 100) * 100) / 100;
+        const quoteBal = Math.round(Math.max(0, total - quoteDep) * 100) / 100;
+        return {
+          policy: 'pay_at_appointment',
+          useStripe: false,
+          dueNow: 0,
+          depositEstimate: quoteDep,
+          balanceDue: quoteBal,
+          depositPercent: defaultPct,
+          isDeposit: true,
+          canChoose: false,
+        };
+      }
+      const s = service();
+      const policy =
+        s.paymentPolicy === 'deposit_fixed' || s.paymentPolicy === 'pay_at_appointment'
+          ? s.paymentPolicy
+          : 'deposit_percent';
+      const dep =
+        policy === 'deposit_percent'
+          ? Number(s.depositAmount) > 0 && s.paymentPolicy === 'deposit_percent'
+            ? Number(s.depositAmount)
+            : defaultPct
+          : Math.max(0, Number(s.depositAmount || 0));
+
+      if (policy === 'pay_at_appointment') {
+        return {
+          policy,
+          useStripe: false,
+          dueNow: 0,
+          balanceDue: total,
+          depositPercent: defaultPct,
+          isDeposit: false,
+          canChoose: false,
+        };
+      }
+      if (policy === 'deposit_fixed') {
+        const due = Math.round(Math.min(total, dep) * 100) / 100;
+        const bal = Math.round(Math.max(0, total - due) * 100) / 100;
+        return {
+          policy,
+          useStripe: due >= 0.5,
+          dueNow: due,
+          balanceDue: bal,
+          depositPercent: defaultPct,
+          isDeposit: bal > 0,
+          canChoose: false,
+        };
+      }
+
+      const pct = Math.min(100, dep || defaultPct);
+      const due = Math.round(((total * pct) / 100) * 100) / 100;
+      const bal = Math.round(Math.max(0, total - due) * 100) / 100;
+      return {
+        policy: 'deposit_percent',
+        useStripe: due >= 0.5,
+        dueNow: due,
+        balanceDue: bal,
+        depositPercent: pct,
+        isDeposit: bal > 0,
+        canChoose: false,
+      };
+    }
+
+    function updateReviewSubmitButton() {
+      const nextBtn = $('#nextBtn');
+      if (!nextBtn || state.step !== 6) return;
+      if (state.path === 'quote') {
+        nextBtn.innerHTML = `Submit Quote Request <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+        return;
+      }
+      const pay = computePaymentBreakdown();
+      if (pay.useStripe) {
+        const pctTag = pay.depositPercent ? `${pay.depositPercent}% ` : '';
+        const label = pay.isDeposit
+          ? `Pay $${pay.dueNow.toFixed(2)} (${pctTag}Deposit) & Confirm`
+          : `Pay $${pay.dueNow.toFixed(2)} via Stripe & Confirm`;
+        nextBtn.innerHTML = `${label} <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>`;
+      } else {
+        nextBtn.innerHTML = `Submit Booking Request <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+      }
+    }
+
+    function renderPaymentOptions() {
+      const box = $('#paymentSelectionBox');
+      if (!box) return;
+      const pay = computePaymentBreakdown();
+      const pct = pay.depositPercent || 50;
+      const policyNote = escapeHtml(
+        state.depositPolicyText ||
+        `A ${pct}% non-refundable deposit is required to secure and officially confirm your appointment (subject to North Carolina notary fee regulations) and is applied directly toward your total service cost. The remaining ${100 - pct}% balance is due at the time of service. Deposits are non-refundable for customer cancellations or no-shows where legally permitted. If Direct Mobile Notary & Verification Services cancels the appointment, your deposit will be refunded in full.`
+      );
+
+      if (state.path === 'quote') {
+        box.style.display = 'block';
+        box.innerHTML = `
+          <div class="payment-box-title">
+            <b>${pct}% Non-Refundable Deposit &amp; Quote Approval Policy</b>
+            <span class="stripe-pill">Custom Quote Review</span>
+          </div>
+          <p style="margin:0 0 10px;font-size:13px;color:var(--muted);line-height:1.55">${policyNote}</p>
+          <div class="payment-due-row">
+            <span>Estimated ${pct}% Deposit (Due Upon Quote Approval):</span>
+            <strong style="color:var(--purple)">$${Number(pay.depositEstimate || 0).toFixed(2)}</strong>
+          </div>
+          <div class="payment-due-row" style="border-top:none;padding-top:4px;margin-top:0">
+            <span>Estimated Remaining ${100 - pct}% Due at Time of Service:</span>
+            <strong>$${Number(pay.balanceDue || 0).toFixed(2)}</strong>
+          </div>
+        `;
+        updateReviewSubmitButton();
+        return;
+      }
+
+      if (!state.stripeEnabled || pay.policy === 'pay_at_appointment') {
+        box.style.display = 'block';
+        box.innerHTML = `
+          <div class="payment-box-title">
+            <b>${pct}% Non-Refundable Deposit &amp; Payment Policy</b>
+            <span class="stripe-pill">Deposit Required to Confirm</span>
+          </div>
+          <p style="margin:0;font-size:13px;color:var(--muted);line-height:1.55">${policyNote}</p>
+        `;
+        updateReviewSubmitButton();
+        return;
+      }
+
+      box.style.display = 'block';
+      box.innerHTML = `
+        <div class="payment-box-title">
+          <b>${pay.isDeposit ? `${pct}% Non-Refundable Deposit Required to Confirm` : 'Advance Payment Required'}</b>
+          <span class="stripe-pill">Stripe Secure Checkout · Card / Apple Pay / Google Pay</span>
+        </div>
+        <p style="margin:0 0 10px;font-size:13px;color:var(--muted);line-height:1.55">${policyNote}</p>
+        <div class="payment-due-row">
+          <span>Total Service Cost (incl. Travel &amp; Add-ons):</span>
+          <strong>$${Number(state.totalFee || 0).toFixed(2)}</strong>
+        </div>
+        <div class="payment-due-row" style="border-top:none;padding-top:4px;margin-top:0">
+          <span>${pct}% Non-Refundable Deposit Due Now via Stripe:</span>
+          <strong style="color:var(--purple);font-size:15px">$${pay.dueNow.toFixed(2)}</strong>
+        </div>
+        ${pay.balanceDue > 0 ? `
+          <div class="payment-due-row" style="border-top:none;padding-top:4px;margin-top:0">
+            <span>Remaining ${100 - pct}% Balance Due at Time of Service:</span>
+            <strong>$${pay.balanceDue.toFixed(2)}</strong>
+          </div>
+        ` : ''}
+      `;
+      updateReviewSubmitButton();
+    }
+
+    function getReturnPageUrl() {
+      try {
+        if (window.top && window.top.location && window.top.location.href) {
+          return window.top.location.href;
+        }
+      } catch (e) { }
+      return document.referrer || window.location.href;
+    }
+
+    function getCurrentUrlSearch() {
+      try {
+        if (window.top && window.top.location && typeof window.top.location.search === 'string') {
+          return window.top.location.search;
+        }
+      } catch (e) { }
+      return window.location.search || '';
+    }
+
+    function clearStripeParamsFromUrl() {
+      try {
+        const targetWin = (window.top && window.top.location && window.top.history) ? window.top : window;
+        const url = new URL(targetWin.location.href);
+        url.searchParams.delete('dmn_stripe_session');
+        url.searchParams.delete('dmn_stripe_cancel');
+        url.searchParams.delete('dmn_ref');
+        targetWin.history.replaceState({}, '', url.toString());
+      } catch (e) { }
+    }
+
+    function savePendingStripeState(bookingData) {
+      const snapshot = {
+        bookingData,
+        savedAt: Date.now(),
+        uiState: {
+          service: state.service,
+          serviceTitle: service().title,
+          signers: state.signers,
+          signatures: state.signatures,
+          distance: state.distance,
+          drive: state.drive,
+          travel: state.travel,
+          serviceFee: state.serviceFee,
+          addonsFee: state.addonsFee,
+          addonsSummary: state.addonsSummary,
+          totalFee: state.totalFee,
+          paymentChoice: state.paymentChoice,
+          appointmentDate: bookingData.appointmentDate,
+          appointmentTime: bookingData.appointmentTime,
+          address: ($('#address')?.value || '').trim(),
+          city: ($('#city')?.value || '').trim(),
+          zip: ($('#zip')?.value || '').trim(),
+          locationType: ($('#locationType')?.value || 'Home / Residence'),
+          customerName: bookingData.clientName,
+          customerPhone: bookingData.clientPhone,
+          customerEmail: bookingData.clientEmail,
+          specialInstructions: bookingData.specialInstructions,
+          checkedAddonIds: Array.from(self.querySelectorAll('[data-cms-addon]:checked')).map(el => el.getAttribute('data-cms-addon')).filter(Boolean),
+          cmsAnswers: Array.from(self.querySelectorAll('[data-cms-question]')).map(el => ({
+            key: el.getAttribute('data-cms-question'),
+            value: el.type === 'checkbox' ? Boolean(el.checked) : el.value,
+          })),
+        },
+      };
+      const raw = JSON.stringify(snapshot);
+      try { window.localStorage.setItem(`dmn_pending_stripe_${bookingData.bookingRef}`, raw); } catch (e) { }
+      try { window.localStorage.setItem('dmn_pending_stripe_latest', raw); } catch (e) { }
+      try { window.sessionStorage.setItem('dmn_pending_stripe_latest', raw); } catch (e) { }
+    }
+
+    function loadPendingStripeState(ref) {
+      const keys = ref ? [`dmn_pending_stripe_${ref}`, 'dmn_pending_stripe_latest'] : ['dmn_pending_stripe_latest'];
+      for (const k of keys) {
+        try {
+          const raw = window.localStorage.getItem(k) || window.sessionStorage.getItem(k);
+          if (raw) return JSON.parse(raw);
+        } catch (e) { }
+      }
+      return null;
+    }
+
+    function clearPendingStripeState(ref) {
+      try {
+        if (ref) window.localStorage.removeItem(`dmn_pending_stripe_${ref}`);
+        window.localStorage.removeItem('dmn_pending_stripe_latest');
+        window.sessionStorage.removeItem('dmn_pending_stripe_latest');
+      } catch (e) { }
+    }
+
+    function restoreStripeSnapshotToForm(snapshot) {
+      if (!snapshot || !snapshot.uiState) return;
+      const u = snapshot.uiState;
+      if (u.service && services.some(s => s.id === u.service)) {
+        state.service = u.service;
+        renderServices();
+        configureStep3Visibility();
+        renderDynamicBox();
+      }
+      if (Array.isArray(u.cmsAnswers)) {
+        u.cmsAnswers.forEach(ans => {
+          if (!ans || !ans.key) return;
+          const el = self.querySelector(`[data-cms-question="${ans.key}"]`);
+          if (!el) return;
+          if (el.type === 'checkbox') el.checked = Boolean(ans.value);
+          else el.value = String(ans.value ?? '');
+        });
+      }
+      if (Array.isArray(u.checkedAddonIds)) {
+        const set = new Set(u.checkedAddonIds);
+        self.querySelectorAll('[data-cms-addon]').forEach(cb => {
+          const id = cb.getAttribute('data-cms-addon');
+          cb.checked = Boolean(id && set.has(id));
+          cb.closest('.cms-addon')?.classList.toggle('is-selected', cb.checked);
+        });
+      }
+      if (u.signers) state.signers = Number(u.signers);
+      if (u.signatures) state.signatures = Number(u.signatures);
+      if (u.distance != null) state.distance = Number(u.distance);
+      if (u.drive != null) state.drive = Number(u.drive);
+      if (u.travel != null) state.travel = Number(u.travel);
+      if (u.serviceFee != null) state.serviceFee = Number(u.serviceFee);
+      if (u.addonsFee != null) state.addonsFee = Number(u.addonsFee);
+      if (u.addonsSummary) state.addonsSummary = u.addonsSummary;
+      if (u.totalFee != null) state.totalFee = Number(u.totalFee);
+      if (u.paymentChoice) state.paymentChoice = u.paymentChoice;
+      if (u.appointmentDate && $('#bookDate')) $('#bookDate').value = u.appointmentDate;
+      if (u.appointmentTime) {
+        state.appointmentTime = u.appointmentTime;
+        if ($('#bookTime')) $('#bookTime').value = u.appointmentTime;
+      }
+      if (u.address && $('#address')) $('#address').value = u.address;
+      if (u.city && $('#city')) $('#city').value = u.city;
+      if (u.zip && $('#zip')) $('#zip').value = u.zip;
+      if (u.locationType && $('#locationType')) $('#locationType').value = u.locationType;
+      if (u.customerName && $('#customerName')) $('#customerName').value = u.customerName;
+      if (u.customerPhone && $('#customerPhone')) $('#customerPhone').value = u.customerPhone;
+      if (u.customerEmail && $('#customerEmail')) $('#customerEmail').value = u.customerEmail;
+      if (u.specialInstructions && $('#specialInstructions')) $('#specialInstructions').value = u.specialInstructions;
+      if ($('#chkFeeAgreement')) $('#chkFeeAgreement').checked = true;
+    }
+
+    function handleStripeReturnIfNeeded() {
+      if (self._stripeReturnHandled) return;
+      const search = getCurrentUrlSearch();
+      if (!search) return;
+      const params = new URLSearchParams(search);
+      const sessionId = params.get('dmn_stripe_session');
+      const cancelled = params.get('dmn_stripe_cancel');
+      const refParam = params.get('dmn_ref') || '';
+
+      if (!sessionId && !cancelled) return;
+      self._stripeReturnHandled = true;
+      clearStripeParamsFromUrl();
+
+      const snapshot = loadPendingStripeState(refParam);
+      if (snapshot) {
+        restoreStripeSnapshotToForm(snapshot);
+      }
+
+      if (cancelled) {
+        state.step = 1;
+        goTo(6, true);
+        toast('Stripe checkout was cancelled. You can retry payment or pick another option.');
+        return;
+      }
+
+      if (sessionId) {
+        state.lockRestoredTotals = true;
+        state.isSubmitting = true;
+        goTo(7, true);
+        const refId = refParam || snapshot?.bookingData?.bookingRef || '';
+        if ($('#confirmRefId') && refId) {
+          $('#confirmRefId').textContent = refId;
+        }
+        if ($('#confirmHeadingTitle')) {
+          $('#confirmHeadingTitle').textContent = 'Verifying Your Stripe Payment...';
+        }
+        if ($('#confirmHeadingDesc')) {
+          $('#confirmHeadingDesc').textContent = 'Please wait a moment while we verify your 50% deposit and confirm your appointment...';
+        }
+        if ($('#confirmVerifyingSpinner')) $('#confirmVerifyingSpinner').style.display = 'block';
+        if ($('#confirmActionButtons')) $('#confirmActionButtons').style.display = 'none';
+        if ($('#confirmPaymentSummary')) $('#confirmPaymentSummary').style.display = 'none';
+        if ($('#bookingActionBar')) $('#bookingActionBar').style.display = 'none';
+
+        const banner = $('#cmsStatusBanner');
+        if (banner) {
+          banner.style.display = 'block';
+          banner.textContent = 'Verifying your Stripe payment and confirming your appointment...';
+        }
+        toast('Verifying your Stripe payment...');
+
+        const dispatchComplete = () => {
+          self.dispatchEvent(new CustomEvent('requestStripeComplete', {
+            detail: {
+              sessionId,
+              bookingData: snapshot?.bookingData || { bookingRef: refParam },
+            },
+            bubbles: true,
+            composed: true,
+          }));
+        };
+
+        dispatchComplete();
+        setTimeout(dispatchComplete, 120);
+        setTimeout(dispatchComplete, 600);
+
+        setTimeout(() => {
+          if (state.isSubmitting && $('#btnRetryStripeVerify')) {
+            $('#btnRetryStripeVerify').style.display = 'inline-block';
+          }
+        }, 5000);
+
+        $('#btnRetryStripeVerify')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          toast('Verifying payment with Stripe...');
+          dispatchComplete();
+        });
+      }
     }
 
     function toast(msg) {
@@ -2378,21 +3105,92 @@ class DirectNotaryBooking extends HTMLElement {
       }
     };
 
+    self._onStripeCheckoutResult = function (res) {
+      const nextBtn = $('#nextBtn');
+      const redirBox = $('#stripeRedirectBox');
+      if (res && res.success && res.checkoutUrl) {
+        if (redirBox) {
+          redirBox.style.display = 'block';
+          redirBox.innerHTML = `Redirecting to secure Stripe Checkout... <a href="${escapeHtml(res.checkoutUrl)}" target="_top" style="font-weight:700;color:var(--purple);text-decoration:underline;margin-left:6px">Click here if not redirected</a>`;
+        }
+        try {
+          if (window.top && window.top.location) {
+            window.top.location.href = res.checkoutUrl;
+            return;
+          }
+        } catch (e) { }
+        window.location.href = res.checkoutUrl;
+        return;
+      }
+
+      state.isSubmitting = false;
+      if (nextBtn) {
+        nextBtn.disabled = false;
+        updateReviewSubmitButton();
+      }
+      toast(`Stripe Checkout error: ${res?.error || 'Unable to start payment session.'}`);
+    };
+
     self._onSubmissionStatus = function (statusData) {
       state.isSubmitting = false;
       const nextBtn = $('#nextBtn');
       if (nextBtn) nextBtn.disabled = false;
+      if ($('#cmsStatusBanner')) $('#cmsStatusBanner').style.display = 'none';
 
       if (statusData && statusData.success) {
+        if ($('#confirmVerifyingSpinner')) $('#confirmVerifyingSpinner').style.display = 'none';
+        if ($('#confirmActionButtons')) $('#confirmActionButtons').style.display = 'flex';
         if ($('#confirmRefId') && statusData.bookingRef) {
           $('#confirmRefId').textContent = statusData.bookingRef;
         }
-        goTo(7);
+        if (statusData.paymentStatus) state.paymentStatus = statusData.paymentStatus;
+        if (statusData.amountPaid != null) state.amountPaid = Number(statusData.amountPaid);
+        if (statusData.balanceDue != null) state.balanceDue = Number(statusData.balanceDue);
+        if (statusData.paymentPreference) state.paymentPreferenceText = statusData.paymentPreference;
+
+        const payPill = $('#confirmPaymentSummary');
+        if (statusData.stripeCompleted) {
+          clearPendingStripeState(statusData.bookingRef);
+          if ($('#confirmHeadingTitle')) {
+            $('#confirmHeadingTitle').textContent =
+              state.balanceDue > 0 ? '50% Deposit Paid & Appointment Confirmed!' : 'Payment Confirmed & Appointment Booked!';
+          }
+          if ($('#confirmHeadingDesc')) {
+            $('#confirmHeadingDesc').textContent =
+              state.balanceDue > 0
+                ? `Thank you! Your non-refundable Stripe deposit of $${state.amountPaid.toFixed(2)} has been received and your appointment is officially confirmed. Your remaining balance of $${state.balanceDue.toFixed(2)} is due at the time of service.`
+                : `Thank you! Your Stripe payment of $${state.amountPaid.toFixed(2)} has been confirmed and your appointment is officially scheduled.`;
+          }
+          if (payPill) {
+            payPill.style.display = 'inline-flex';
+            payPill.textContent =
+              state.balanceDue > 0
+                ? `Total Cost: $${Number(state.totalFee || 0).toFixed(2)} • Deposit Paid: $${state.amountPaid.toFixed(2)} • Remaining Balance Due: $${state.balanceDue.toFixed(2)}`
+                : `Paid in Full via Stripe: $${state.amountPaid.toFixed(2)}`;
+          }
+        } else {
+          if (payPill) payPill.style.display = 'none';
+          if ($('#confirmHeadingTitle') && state.path === 'quote') {
+            $('#confirmHeadingTitle').textContent = 'Quote Request Submitted!';
+          } else if ($('#confirmHeadingTitle')) {
+            $('#confirmHeadingTitle').textContent = 'Appointment Request Submitted!';
+          }
+          if ($('#confirmHeadingDesc') && state.path !== 'quote') {
+            $('#confirmHeadingDesc').textContent =
+              'Thank you! Your appointment request has been received. Note: Appointments are officially confirmed once the required 50% deposit is received.';
+          }
+        }
+
+        goTo(7, true);
       } else {
+        if ($('#confirmVerifyingSpinner')) $('#confirmVerifyingSpinner').style.display = 'none';
+        if ($('#confirmActionButtons')) $('#confirmActionButtons').style.display = 'flex';
+        if (statusData?.stripeCompleted) {
+          state.lockRestoredTotals = false;
+          goTo(6, true);
+        }
         if (state.step === 6 && nextBtn) {
-          nextBtn.innerHTML = state.path === 'quote'
-            ? `Submit Quote Request <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`
-            : `Submit Booking Request <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+          updateReviewSubmitButton();
         }
         toast(`Submission failed: ${statusData?.error || 'Please try again or contact us directly.'}`);
       }
@@ -2419,7 +3217,9 @@ class DirectNotaryBooking extends HTMLElement {
       }).join('');
       const statusEl = $('#journeyStatus');
       if (statusEl) {
-        statusEl.textContent = state.step === 7 ? 'Booking Request Confirmed' : `Step ${state.step} of 6 · ${stepNames[state.step - 1] || ''}`;
+        statusEl.textContent = state.step === 7
+          ? (state.isSubmitting ? 'Verifying Stripe Payment...' : (state.amountPaid > 0 ? '50% Deposit Paid · Confirmed' : 'Request Submitted · Pending Approval'))
+          : `Step ${state.step} of 6 · ${stepNames[state.step - 1] || ''}`;
       }
     }
 
@@ -2951,7 +3751,7 @@ class DirectNotaryBooking extends HTMLElement {
 
       return areas.some(a => {
         const ac = String(a.city || a.areaName || '').trim().toLowerCase();
-        const az = String(a.zip || '').trim();
+        const az = String(a.zipCode || a.zip || '').trim();
         if (az && z && az === z) return true;
         if (ac && c && (c.includes(ac) || ac.includes(c))) return true;
         return false;
@@ -3011,7 +3811,14 @@ class DirectNotaryBooking extends HTMLElement {
       // 3. CMS-DRIVEN ADD-ONS (supports flat, per_signature, per_signer)
       state.addonsFee = printingFee;
       const selectedAddons = [];
-      if (printingSummary) selectedAddons.push(printingSummary);
+      const addonItems = [];
+      if (printingSummary) {
+        selectedAddons.push(printingSummary);
+        addonItems.push({
+          label: printingSummary.replace(/\s*\(\+\$[\d.]+\)$/, ''),
+          amount: Math.round(printingFee * 100) / 100,
+        });
+      }
 
       self.querySelectorAll('[data-cms-addon]:checked').forEach(cb => {
         const base = Number(cb.getAttribute('data-fee') || 0);
@@ -3020,11 +3827,15 @@ class DirectNotaryBooking extends HTMLElement {
         const lbl = cb.getAttribute('data-label') || cb.getAttribute('data-cms-addon');
         state.addonsFee += fee;
         selectedAddons.push(`${lbl} (+$${fee.toFixed(2)})`);
+        if (fee > 0) {
+          addonItems.push({ label: lbl, amount: Math.round(fee * 100) / 100 });
+        }
       });
 
       state.addonsFee = Math.round(state.addonsFee * 100) / 100;
       state.addonsSummary = selectedAddons.length > 0 ? selectedAddons.join('; ') : 'None';
       state.addonsList = selectedAddons;
+      state.addonItems = addonItems;
 
       // 4. TRAVEL & GRAND TOTAL
       const travelVal = state.travel != null ? state.travel : 0;
@@ -3047,7 +3858,9 @@ class DirectNotaryBooking extends HTMLElement {
     }
 
     function updateSummary() {
-      calculateFees();
+      if (!state.lockRestoredTotals && state.step !== 7) {
+        calculateFees();
+      }
       const s = service();
       const city = ($('#city')?.value || '').trim();
       const zip = ($('#zip')?.value || '').trim();
@@ -3290,6 +4103,21 @@ class DirectNotaryBooking extends HTMLElement {
                   <td>Total Estimated Due</td>
                   <td class="amount">${grandTotalStr}</td>
                 </tr>
+                ${state.amountPaid > 0 ? `
+                <tr>
+                  <td><strong>Paid Online via Stripe (${escapeHtml(state.paymentStatus || 'Paid')})</strong></td>
+                  <td class="amount" style="color:#065f46">-$${state.amountPaid.toFixed(2)}</td>
+                </tr>
+                <tr class="total-row">
+                  <td>Remaining Balance Due</td>
+                  <td class="amount">$${Number(state.balanceDue || 0).toFixed(2)}</td>
+                </tr>
+                ` : `
+                <tr>
+                  <td>Payment Method</td>
+                  <td class="amount">${escapeHtml(state.paymentPreferenceText || (state.path === 'quote' ? 'Quote Review – Pay upon approval' : 'Pay at appointment'))}</td>
+                </tr>
+                `}
               </tbody>
             </table>
 
@@ -3443,6 +4271,12 @@ class DirectNotaryBooking extends HTMLElement {
       state.drive = null;
       state.travel = null;
       state.destCoords = null;
+      state.paymentChoice = 'stripe';
+      state.paymentStatus = '';
+      state.amountPaid = 0;
+      state.balanceDue = 0;
+      state.paymentPreferenceText = '';
+      state.lockRestoredTotals = false;
       state.appointmentTime = '';
       state.quoteWindow = 'Afternoon (12 PM – 4 PM)';
       if ($('#bookTime')) $('#bookTime').value = '';
@@ -3456,8 +4290,8 @@ class DirectNotaryBooking extends HTMLElement {
       toast('Ready for a new booking.');
     }
 
-    function goTo(n) {
-      if (n > state.step && state.step <= 6 && !validate(state.step)) return;
+    function goTo(n, force = false) {
+      if (!force && n > state.step && state.step <= 6 && !validate(state.step)) return;
       state.step = Math.max(1, Math.min(7, n));
 
       $$('.task-view').forEach(v => {
@@ -3473,7 +4307,9 @@ class DirectNotaryBooking extends HTMLElement {
         { c: 'Step 04 · Appointment', t: 'When works best for you?', i: 'Choose your preferred date and appointment time slot.' },
         { c: 'Step 05 · Contact', t: 'Where should we send updates?', i: 'Appointment confirmation and travel reminders.' },
         { c: 'Step 06 · Review', t: 'Review Your Request', i: 'Check your itemized notarial and travel charges before submitting.' },
-        { c: 'Step 06 · Confirmed', t: 'Booking Request Submitted!', i: 'Your appointment details are saved in the dispatch system.' }
+        state.isSubmitting
+          ? { c: 'Payment Verification', t: 'Verifying Your Payment...', i: 'Please wait a moment while we verify your Stripe deposit and confirm your appointment.' }
+          : { c: 'Step 06 · Submitted', t: 'Appointment Request Submitted!', i: 'Your request has been received and is awaiting owner approval.' }
       ];
 
       const m = titles[state.step - 1] || titles[0];
@@ -3584,6 +4420,9 @@ class DirectNotaryBooking extends HTMLElement {
         if ($('#revTravelFee')) $('#revTravelFee').textContent = state.travel != null ? `$${state.travel.toFixed(2)}` : 'Calculated after route';
         const subtotal = state.serviceFee + state.addonsFee;
         if ($('#revTotal')) $('#revTotal').textContent = state.travel != null ? `$${state.totalFee.toFixed(2)}` : `$${subtotal.toFixed(2)} + Travel`;
+        renderPaymentOptions();
+      } else if ($('#stripeRedirectBox')) {
+        $('#stripeRedirectBox').style.display = 'none';
       }
 
       renderJourney();
@@ -3614,6 +4453,7 @@ class DirectNotaryBooking extends HTMLElement {
         state.originCoords = { lat: Number(cfg.originLat), lng: Number(cfg.originLng) };
       }
       if (cfg.tripCalculationMode) state.tripCalculationMode = cfg.tripCalculationMode;
+      state.stripeEnabled = Boolean(cfg.stripeEnabled);
       if (cfg.businessName) state.businessName = String(cfg.businessName);
       if (cfg.businessPhone) {
         state.businessPhone = String(cfg.businessPhone).trim();
@@ -3626,6 +4466,8 @@ class DirectNotaryBooking extends HTMLElement {
         }
       }
       if (cfg.receiptDisclaimer) state.receiptDisclaimer = String(cfg.receiptDisclaimer);
+      if (cfg.defaultDepositPercent != null) state.defaultDepositPercent = Number(cfg.defaultDepositPercent);
+      if (cfg.depositPolicyText) state.depositPolicyText = String(cfg.depositPolicyText);
 
       if (cfg.placesApiKey) {
         initPlacesAutocomplete(cfg.placesApiKey);
@@ -3647,6 +4489,8 @@ class DirectNotaryBooking extends HTMLElement {
           basePrice: Number(s.basePrice != null ? s.basePrice : 0),
           pricingModel: s.pricingModel || (s.isQuoteOnly ? 'quote_only' : 'flat'),
           isQuoteOnly: Boolean(s.isQuoteOnly || s.pricingModel === 'quote_only'),
+          paymentPolicy: s.paymentPolicy || 'deposit_percent',
+          depositAmount: Number(s.depositAmount != null && s.depositAmount > 0 ? s.depositAmount : (state.defaultDepositPercent || 50)),
           mode: s.mode || (s.isQuoteOnly || s.pricingModel === 'quote_only' ? 'quote' : 'instant'),
           popularLabel: s.popularLabel || '',
           hiddenByDefault: Boolean(s.hiddenByDefault),
@@ -3667,6 +4511,7 @@ class DirectNotaryBooking extends HTMLElement {
       renderDynamicBox();
       renderDynamicTimeSlots();
       updateSummary();
+      handleStripeReturnIfNeeded();
     };
 
     if (self._pendingSiteConfig) {
@@ -3771,7 +4616,7 @@ class DirectNotaryBooking extends HTMLElement {
           serviceName: service().title,
           serviceId: service().id,
           bookingType: state.path,
-          status: state.path === 'quote' ? 'Pending Quote Approval' : 'Confirmed',
+          status: state.path === 'quote' ? 'Pending Quote Approval' : 'Pending Approval',
           clientName: ($('#customerName')?.value || '').trim(),
           clientPhone: ($('#customerPhone')?.value || '').trim(),
           clientEmail: ($('#customerEmail')?.value || '').trim(),
@@ -3816,7 +4661,47 @@ class DirectNotaryBooking extends HTMLElement {
         };
 
         if (state.isSubmitting) return;
+        const pay = computePaymentBreakdown();
+        if (pay.useStripe && pay.dueNow >= 0.5) {
+          state.isSubmitting = true;
+          savePendingStripeState(bookingData);
+          const nextBtn = $('#nextBtn');
+          if (nextBtn) {
+            nextBtn.disabled = true;
+            nextBtn.textContent = 'Starting Stripe Checkout...';
+          }
+          self.dispatchEvent(new CustomEvent('requestStripeCheckout', {
+            detail: {
+              bookingRef: newRef,
+              serviceId: service().id,
+              serviceName: service().title,
+              serviceFee: state.serviceFee,
+              addonsFee: state.addonsFee || 0,
+              addonsSummary: state.addonsSummary || 'None',
+              addonItems: state.addonItems || [],
+              travelFee: state.travel || 0,
+              drivingMiles: state.distance,
+              tripCalculationMode: state.tripCalculationMode || 'one-way',
+              signersCount: state.signers || 1,
+              notarizedSignatures: state.signatures || 1,
+              grandTotal: state.totalFee,
+              paymentChoice: state.paymentChoice,
+              clientEmail: bookingData.clientEmail,
+              appointmentDate: apptDate,
+              appointmentTime: apptTime,
+              city: cityVal,
+              returnUrl: getReturnPageUrl(),
+            },
+            bubbles: true,
+            composed: true
+          }));
+          return;
+        }
+
         state.isSubmitting = true;
+        state.amountPaid = 0;
+        state.balanceDue = state.totalFee;
+        state.paymentPreferenceText = bookingData.paymentPreference;
         const nextBtn = $('#nextBtn');
         if (nextBtn) {
           nextBtn.disabled = true;
@@ -3897,6 +4782,7 @@ class DirectNotaryBooking extends HTMLElement {
     renderDynamicBox();
     renderDynamicTimeSlots();
     updateSummary();
+    handleStripeReturnIfNeeded();
   }
 }
 

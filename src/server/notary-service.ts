@@ -83,6 +83,17 @@ export async function resolveGoogleApiKeys(settings?: OwnerSettingsRecord): Prom
   };
 }
 
+export async function resolveStripeSecretKey(): Promise<{
+  stripeSecretKey: string;
+  secretError?: string;
+}> {
+  const res = await readOptionalSecret('STRIPE_SECRET_KEY');
+  return {
+    stripeSecretKey: res.value,
+    secretError: res.error,
+  };
+}
+
 export async function readOwnerSettingsStrict(): Promise<OwnerSettingsRecord> {
   const rows = await elevatedQueryAll(COLLECTION_IDS.SETTINGS);
   const preferred =
@@ -140,22 +151,192 @@ export async function getLiveBookingConfig() {
     serviceAreas = [];
   }
 
-  const services = rawServices
-    .map(mapService)
-    .filter((s) => s.active && (settings.enableRonService || s.serviceId !== 'ron'))
+  const defaultDepositPct = Math.max(
+    0,
+    Math.min(100, Number(settings.defaultDepositPercent ?? 50)),
+  );
+  const mappedAllServices = rawServices.map(mapService);
+
+  // Ensure Virtual Hearing Support is present in the catalog
+  if (!mappedAllServices.some((s) => s.serviceId === 'virtual_hearing')) {
+    mappedAllServices.push({
+      _id: 'srv-virtual-hearing',
+      title: 'Virtual Hearing Support',
+      serviceId: 'virtual_hearing',
+      description:
+        'In-person oath administration, witness swearing-in, identity verification, and attestation for virtual court trials, depositions, and administrative hearings.',
+      basePrice: 35,
+      pricingModel: 'flat',
+      isQuoteOnly: false,
+      paymentPolicy: 'deposit_percent',
+      depositAmount: defaultDepositPct,
+      popularLabel: 'Court & Virtual',
+      imageUrl:
+        'https://images.pexels.com/photos/5668473/pexels-photo-5668473.jpeg?auto=compress&cs=tinysrgb&w=600',
+      hiddenByDefault: false,
+      sortOrder: 9,
+      active: true,
+    });
+  }
+
+  // Allow future activation of RON and IPEN via OwnerSettings toggles without rebuilding
+  if (settings.enableRonService && !mappedAllServices.some((s) => s.serviceId === 'ron')) {
+    mappedAllServices.push({
+      _id: 'srv-ron',
+      title: 'Remote Online Notarization (RON)',
+      serviceId: 'ron',
+      description:
+        'Audio-video remote online notarization on an approved North Carolina platform.',
+      basePrice: 25,
+      pricingModel: 'flat',
+      isQuoteOnly: false,
+      paymentPolicy: 'deposit_percent',
+      depositAmount: defaultDepositPct,
+      popularLabel: 'Online Session',
+      imageUrl:
+        'https://images.pexels.com/photos/7820383/pexels-photo-7820383.jpeg?auto=compress&cs=tinysrgb&w=600',
+      hiddenByDefault: false,
+      sortOrder: 10,
+      active: true,
+    });
+  }
+
+  if (settings.enableIpenService && !mappedAllServices.some((s) => s.serviceId === 'ipen')) {
+    mappedAllServices.push({
+      _id: 'srv-ipen',
+      title: 'In-Person Electronic Notarization (IPEN)',
+      serviceId: 'ipen',
+      description:
+        'In-person electronic notarization on an approved digital platform with both signer and notary physically present.',
+      basePrice: 15,
+      pricingModel: 'per_signature',
+      isQuoteOnly: false,
+      paymentPolicy: 'deposit_percent',
+      depositAmount: defaultDepositPct,
+      popularLabel: 'Digital In-Person',
+      imageUrl:
+        'https://images.pexels.com/photos/7688336/pexels-photo-7688336.jpeg?auto=compress&cs=tinysrgb&w=600',
+      hiddenByDefault: false,
+      sortOrder: 10,
+      active: true,
+    });
+  }
+
+  const services = mappedAllServices
+    .filter((s) => {
+      if (s.serviceId === 'ron') return Boolean(settings.enableRonService);
+      if (s.serviceId === 'ipen') return Boolean(settings.enableIpenService);
+      return s.active;
+    })
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((s) => ({
-      ...s,
-      id: s.serviceId || s._id,
-      desc: s.description,
-      mode: s.isQuoteOnly || s.pricingModel === 'quote_only' ? 'quote' : 'instant',
-      img: s.imageUrl,
-    }));
+    .map((s) => {
+      const isQuote = s.isQuoteOnly || s.pricingModel === 'quote_only';
+      const policy = isQuote
+        ? 'pay_at_appointment'
+        : s.paymentPolicy === 'deposit_fixed' || s.paymentPolicy === 'pay_at_appointment'
+          ? s.paymentPolicy
+          : 'deposit_percent';
+      const depAmt = isQuote
+        ? 0
+        : policy === 'deposit_percent'
+          ? s.depositAmount && s.depositAmount > 0 && s.paymentPolicy === 'deposit_percent'
+            ? s.depositAmount
+            : defaultDepositPct
+          : Number(s.depositAmount ?? 0);
+      return {
+        ...s,
+        paymentPolicy: policy,
+        depositAmount: depAmt,
+        id: s.serviceId || s._id,
+        desc: s.description,
+        mode: isQuote ? 'quote' : 'instant',
+        img: s.imageUrl,
+      };
+    });
 
   const bookingQuestions = rawQuestions
     .map(mapQuestion)
     .filter((q) => q.active)
     .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  if (!bookingQuestions.some((q) => q.serviceId === 'virtual_hearing')) {
+    bookingQuestions.push(
+      {
+        _id: 'vh-hearing-type',
+        title: 'Hearing Type',
+        questionId: 'virtual_hearing-hearingType',
+        serviceId: 'virtual_hearing',
+        fieldKey: 'hearingType',
+        label: 'Hearing Type',
+        inputType: 'select',
+        placeholder: 'Select an option',
+        required: true,
+        active: true,
+        protected: false,
+        sortOrder: 1,
+        section: 'Service Details',
+        feeAmount: 0,
+        feeType: 'flat',
+        options:
+          'Virtual Court Trial, Deposition, Administrative Hearing, Arbitration / Mediation, Other',
+      },
+      {
+        _id: 'vh-duty',
+        title: 'Requested Service',
+        questionId: 'virtual_hearing-duty',
+        serviceId: 'virtual_hearing',
+        fieldKey: 'duty',
+        label: 'Requested Service',
+        inputType: 'select',
+        placeholder: 'Select an option',
+        required: true,
+        active: true,
+        protected: false,
+        sortOrder: 2,
+        section: 'Service Details',
+        feeAmount: 0,
+        feeType: 'flat',
+        options: 'Identity Verification & Oath, Witness Swearing-in, Attestation, Other',
+      },
+      {
+        _id: 'vh-platform',
+        title: 'Hearing Platform',
+        questionId: 'virtual_hearing-platform',
+        serviceId: 'virtual_hearing',
+        fieldKey: 'platform',
+        label: 'Hearing Platform',
+        inputType: 'text',
+        placeholder: 'e.g. Zoom, WebEx, Microsoft Teams',
+        required: true,
+        active: true,
+        protected: false,
+        sortOrder: 3,
+        section: 'Service Details',
+        feeAmount: 0,
+        feeType: 'flat',
+        options: '',
+      },
+      {
+        _id: 'vh-duration',
+        title: 'Expected Duration',
+        questionId: 'virtual_hearing-duration',
+        serviceId: 'virtual_hearing',
+        fieldKey: 'duration',
+        label: 'Expected Duration',
+        inputType: 'select',
+        placeholder: 'Select an option',
+        required: true,
+        active: true,
+        protected: false,
+        sortOrder: 4,
+        section: 'Service Details',
+        feeAmount: 0,
+        feeType: 'flat',
+        options:
+          'Under 30 Minutes, 30–60 Minutes, 1–2 Hours, Half Day (2–4 Hours), Full Day (4+ Hours)',
+      },
+    );
+  }
 
   const bookingAddons = rawAddons
     .map(mapAddon)
@@ -174,21 +355,15 @@ export async function getLiveBookingConfig() {
     throw new Error('No active services found in ServicesCatalog CMS collection.');
   }
 
-  const { placesApiKey, routesApiKey } = await resolveGoogleApiKeys(settings);
-
-  if ((!settings.originLat || !settings.originLng) && settings.defaultOriginAddress) {
-    const geo = await geocodeOriginAddress(
-      settings.defaultOriginAddress,
-      placesApiKey || routesApiKey,
-    );
-    if (geo) {
-      settings.originLat = geo.lat;
-      settings.originLng = geo.lng;
-    }
-  }
+  const [{ placesApiKey }, { stripeSecretKey }] = await Promise.all([
+    resolveGoogleApiKeys(settings),
+    resolveStripeSecretKey(),
+  ]);
 
   const {
     defaultOriginAddress: _privateOriginAddress,
+    originLat: _privateOriginLat,
+    originLng: _privateOriginLng,
     googlePlacesApiKey: _privatePlacesKey,
     googleRoutesApiKey: _privateRoutesKey,
     ...publicSettings
@@ -203,6 +378,7 @@ export async function getLiveBookingConfig() {
     businessHours,
     serviceAreas,
     placesApiKey,
+    stripeEnabled: Boolean(stripeSecretKey),
   };
 }
 
@@ -238,10 +414,52 @@ function normalizePrintingLabel(rawPrinting: unknown, serviceId: string): string
   return clean;
 }
 
+const DEFAULT_BUSINESS_TIME_ZONE = 'America/New_York';
+
+function buildZonedDate(
+  yr: number,
+  mo: number,
+  da: number,
+  hh: number,
+  mm: number,
+  timeZone = DEFAULT_BUSINESS_TIME_ZONE,
+): Date {
+  const utcGuess = Date.UTC(yr, mo, da, hh, mm, 0, 0);
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: timeZone || DEFAULT_BUSINESS_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    const parts = Object.fromEntries(
+      fmt.formatToParts(new Date(utcGuess)).map((p) => [p.type, p.value]),
+    );
+    const renderedHour = Number(parts.hour === '24' ? '0' : parts.hour);
+    const renderedUtc = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      renderedHour,
+      Number(parts.minute),
+      Number(parts.second),
+      0,
+    );
+    return new Date(utcGuess + (utcGuess - renderedUtc));
+  } catch {
+    return new Date(yr, mo, da, hh, mm, 0, 0);
+  }
+}
+
 function buildAppointmentDateTime(
   appointmentTimeDate: unknown,
   cleanDateStr: string,
   time24: string,
+  timeZone?: string,
 ): Date | undefined {
   if (appointmentTimeDate) {
     const parsed = new Date(String(appointmentTimeDate));
@@ -253,7 +471,7 @@ function buildAppointmentDateTime(
     const mo = parseInt(dp[1], 10) - 1;
     const da = parseInt(dp[2], 10);
     const [hh, mm] = time24.split(':').map((n) => parseInt(n, 10) || 0);
-    const candidate = new Date(yr, mo, da, hh, mm, 0, 0);
+    const candidate = buildZonedDate(yr, mo, da, hh, mm, timeZone || DEFAULT_BUSINESS_TIME_ZONE);
     if (!Number.isNaN(candidate.getTime())) return candidate;
   }
   return undefined;
@@ -268,6 +486,8 @@ export function buildReminderSchedule(params: {
   appointmentDate?: unknown;
   appointmentTime?: unknown;
   bookingType?: unknown;
+  status?: unknown;
+  clientTimeZone?: unknown;
   referenceTimeMs?: number;
 }): {
   appointmentTimeDate?: Date;
@@ -278,12 +498,18 @@ export function buildReminderSchedule(params: {
 } {
   const cleanDateStr = String(params.appointmentDate ?? '').split('T')[0];
   const time24 = normalizeTime24(params.appointmentTime);
+  // Always calculate appointment and reminder timestamps using Eastern Time (America/New_York)
+  const tz = DEFAULT_BUSINESS_TIME_ZONE;
   const apptDateObj = buildAppointmentDateTime(
-    params.appointmentTimeDate,
+    undefined,
     cleanDateStr,
     time24,
+    tz,
   );
   const isQuote = String(params.bookingType ?? '').toLowerCase().trim() === 'quote';
+  const statusNorm = String(params.status ?? '').toLowerCase().trim();
+  // Reminders fire only when confirmed (cancelled, completed, or pending quotes stay 'No').
+  const isReminderEligible = statusNorm ? statusNorm === 'confirmed' : !isQuote;
   const nowMs =
     typeof params.referenceTimeMs === 'number' && Number.isFinite(params.referenceTimeMs)
       ? params.referenceTimeMs
@@ -301,10 +527,10 @@ export function buildReminderSchedule(params: {
     reminder24HDate = new Date(r24Ms);
     reminder2HDate = new Date(r2Ms);
 
-    if (!isQuote && r24Ms - nowMs >= ONE_MIN_MS) {
+    if (isReminderEligible && r24Ms - nowMs >= ONE_MIN_MS) {
       appointment24Hoursago = 'Yes';
     }
-    if (!isQuote && r2Ms - nowMs >= ONE_MIN_MS) {
+    if (isReminderEligible && r2Ms - nowMs >= ONE_MIN_MS) {
       appointment2Hoursago = 'Yes';
     }
   }
@@ -348,6 +574,14 @@ export async function insertElevatedBooking(payload: RawItem) {
 
   const cleanDateStr = String(payload.appointmentDate ?? '').split('T')[0];
   const time24 = normalizeTime24(payload.appointmentTime24 || payload.appointmentTime);
+  const amountPaidNum = Number(payload.amountPaid ?? 0);
+  const resolvedStatus =
+    String(payload.status ?? '').trim() ||
+    (bookingType === 'quote'
+      ? 'Pending Quote Approval'
+      : amountPaidNum > 0
+        ? 'Confirmed'
+        : 'Pending Approval');
   const submittedDateObj = payload.submittedAt
     ? new Date(String(payload.submittedAt))
     : new Date();
@@ -362,6 +596,8 @@ export async function insertElevatedBooking(payload: RawItem) {
     appointmentDate: cleanDateStr,
     appointmentTime: time24,
     bookingType,
+    status: resolvedStatus,
+    clientTimeZone: payload.clientTimeZone,
     referenceTimeMs,
   });
   const apptDateObj = schedule.appointmentTimeDate;
@@ -403,9 +639,7 @@ export async function insertElevatedBooking(payload: RawItem) {
     serviceName,
     serviceId,
     bookingType,
-    status:
-      String(payload.status ?? '').trim() ||
-      (bookingType === 'quote' ? 'Pending Quote Approval' : 'Confirmed'),
+    status: resolvedStatus,
     clientName,
     clientPhone: String(payload.clientPhone ?? ''),
     clientEmail,
@@ -424,10 +658,19 @@ export async function insertElevatedBooking(payload: RawItem) {
     appointmentDate: cleanDateStr,
     appointmentTime: time24,
     appointmentTimeDate: apptDateObj,
-    ...(schedule.reminder24HDate ? { reminder24HDate: schedule.reminder24HDate } : {}),
-    ...(schedule.reminder2HDate ? { reminder2HDate: schedule.reminder2HDate } : {}),
+    ...(schedule.reminder24HDate
+      ? { reminder24HDate: schedule.reminder24HDate, reminder24hDate: schedule.reminder24HDate }
+      : {}),
+    ...(schedule.reminder2HDate
+      ? { reminder2HDate: schedule.reminder2HDate, reminder2hDate: schedule.reminder2HDate }
+      : {}),
     appointment24Hoursago: schedule.appointment24Hoursago,
+    appointment24hoursago: schedule.appointment24Hoursago,
     appointment2Hoursago: schedule.appointment2Hoursago,
+    appointment2hoursago: schedule.appointment2Hoursago,
+    cancelEmailTrigger: 'No',
+    rescheduleEmailTrigger: 'No',
+    quoteApprovedEmailTrigger: 'No',
     signersCount: Number(payload.signersCount ?? 1),
     notarizedSignatures: Number(payload.notarizedSignatures ?? 0),
     pageCount: String(payload.pageCount ?? '1–25 pages'),
@@ -446,6 +689,14 @@ export async function insertElevatedBooking(payload: RawItem) {
         ? payload.selectedAddons
         : JSON.stringify(payload.selectedAddons ?? []),
     paymentPreference: String(payload.paymentPreference ?? ''),
+    paymentStatus:
+      String(payload.paymentStatus ?? '').trim() ||
+      (bookingType === 'quote' ? 'Quote Review' : 'Pay at Appointment'),
+    amountPaid: Number(payload.amountPaid ?? 0),
+    balanceDue:
+      payload.balanceDue != null ? Number(payload.balanceDue) : Math.max(0, grandTotal),
+    stripeSessionId: String(payload.stripeSessionId ?? ''),
+    stripePaymentIntentId: String(payload.stripePaymentIntentId ?? ''),
     specialInstructions: String(payload.specialInstructions ?? ''),
     serviceSpecificDetails:
       typeof payload.serviceSpecificDetails === 'string'
@@ -457,31 +708,147 @@ export async function insertElevatedBooking(payload: RawItem) {
 
   const elevatedInsert = auth.elevate(items.insert);
   const inserted = await elevatedInsert(COLLECTION_IDS.APPOINTMENTS, record);
+  const insertedId = String(inserted?._id ?? '');
+
+  // When an Instant Booking is confirmed upon receiving the required 50% deposit,
+  // pulse an Item Updated event so the 24-hour and 2-hour reminder automations schedule immediately,
+  // then reset all trigger fields back to 'No' after 4 seconds.
+  if (
+    insertedId &&
+    resolvedStatus === 'Confirmed' &&
+    (schedule.appointment24Hoursago === 'Yes' || schedule.appointment2Hoursago === 'Yes')
+  ) {
+    const elevatedUpdate = auth.elevate(items.update);
+    try {
+      await elevatedUpdate(COLLECTION_IDS.APPOINTMENTS, {
+        ...inserted,
+        ...record,
+        _id: insertedId,
+        quoteApprovedEmailTrigger: 'Yes',
+      });
+      setTimeout(() => {
+        void elevatedUpdate(COLLECTION_IDS.APPOINTMENTS, {
+          ...inserted,
+          ...record,
+          _id: insertedId,
+          cancelEmailTrigger: 'No',
+          rescheduleEmailTrigger: 'No',
+          quoteApprovedEmailTrigger: 'No',
+        }).catch(() => undefined);
+      }, 4000);
+    } catch {
+      // Non-blocking if post-insert reminder trigger update fails.
+    }
+  }
 
   return {
     success: true,
     bookingRef,
-    recordId: String(inserted?._id ?? ''),
+    recordId: insertedId,
+  };
+}
+
+function haveAppointmentDateOrTimeChanged(nextRow: RawItem, existingRow?: RawItem): boolean {
+  if (!existingRow) return false;
+  const prevDate = String(existingRow.appointmentDate ?? '').split('T')[0].trim();
+  const nextDate = String(nextRow.appointmentDate ?? existingRow.appointmentDate ?? '')
+    .split('T')[0]
+    .trim();
+  const prevTime = normalizeTime24(existingRow.appointmentTime24 || existingRow.appointmentTime);
+  const nextTime = normalizeTime24(
+    nextRow.appointmentTime24 ||
+      nextRow.appointmentTime ||
+      existingRow.appointmentTime24 ||
+      existingRow.appointmentTime,
+  );
+  return prevDate !== nextDate || prevTime !== nextTime;
+}
+
+export function buildLifecycleEmailTriggers(
+  nextRow: RawItem,
+  existingRow?: RawItem,
+): {
+  cancelEmailTrigger: 'Yes' | 'No';
+  rescheduleEmailTrigger: 'Yes' | 'No';
+  quoteApprovedEmailTrigger: 'Yes' | 'No';
+} {
+  const nextStatus = String(nextRow.status ?? '').toLowerCase().trim();
+  if (!existingRow) {
+    return {
+      cancelEmailTrigger: nextStatus === 'cancelled' ? 'Yes' : 'No',
+      rescheduleEmailTrigger: 'No',
+      quoteApprovedEmailTrigger: 'No',
+    };
+  }
+
+  const prevStatus = String(existingRow.status ?? '').toLowerCase().trim();
+  const dateChanged = haveAppointmentDateOrTimeChanged(nextRow, existingRow);
+
+  const cancelEmailTrigger: 'Yes' | 'No' =
+    prevStatus !== 'cancelled' && nextStatus === 'cancelled' ? 'Yes' : 'No';
+  const quoteApprovedEmailTrigger: 'Yes' | 'No' =
+    prevStatus !== 'confirmed' && nextStatus === 'confirmed'
+      ? 'Yes'
+      : 'No';
+  const rescheduleEmailTrigger: 'Yes' | 'No' =
+    dateChanged && nextStatus === 'confirmed' && quoteApprovedEmailTrigger === 'No' ? 'Yes' : 'No';
+
+  return {
+    cancelEmailTrigger,
+    rescheduleEmailTrigger,
+    quoteApprovedEmailTrigger,
   };
 }
 
 export function withAppointmentReminders<T extends RawItem>(
   raw: T,
   referenceTimeMs = Date.now(),
+  options?: { recomputeDateTime?: boolean; existing?: RawItem },
 ): T {
+  const dateChanged =
+    Boolean(options?.recomputeDateTime) || haveAppointmentDateOrTimeChanged(raw, options?.existing);
   const schedule = buildReminderSchedule({
-    appointmentTimeDate: raw.appointmentTimeDate,
+    appointmentTimeDate: dateChanged ? undefined : raw.appointmentTimeDate,
     appointmentDate: raw.appointmentDate,
     appointmentTime: raw.appointmentTime24 || raw.appointmentTime,
     bookingType: raw.bookingType,
+    status: raw.status,
+    clientTimeZone: raw.clientTimeZone,
     referenceTimeMs,
   });
+  const triggers = buildLifecycleEmailTriggers(raw, options?.existing);
+  const statusNorm = String(raw.status ?? '').toLowerCase().trim();
+  const grandTotalNum = Math.max(0, Number(raw.grandTotal ?? 0));
+  let amountPaidNum = Number(raw.amountPaid ?? 0);
+  let balanceDueNum =
+    raw.balanceDue != null ? Number(raw.balanceDue) : Math.max(0, grandTotalNum - amountPaidNum);
+
+  if (statusNorm === 'confirmed' && grandTotalNum > 0 && amountPaidNum <= 0) {
+    amountPaidNum = Number((grandTotalNum * 0.5).toFixed(2));
+    balanceDueNum = Number(Math.max(0, grandTotalNum - amountPaidNum).toFixed(2));
+  }
+
   return {
     ...raw,
-    ...(schedule.reminder24HDate ? { reminder24HDate: schedule.reminder24HDate } : {}),
-    ...(schedule.reminder2HDate ? { reminder2HDate: schedule.reminder2HDate } : {}),
+    amountPaid: amountPaidNum,
+    balanceDue: balanceDueNum,
+    ...(schedule.appointmentTimeDate ? { appointmentTimeDate: schedule.appointmentTimeDate } : {}),
+    ...(schedule.reminder24HDate
+      ? { reminder24HDate: schedule.reminder24HDate, reminder24hDate: schedule.reminder24HDate }
+      : {}),
+    ...(schedule.reminder2HDate
+      ? { reminder2HDate: schedule.reminder2HDate, reminder2hDate: schedule.reminder2HDate }
+      : {}),
     appointment24Hoursago: schedule.appointment24Hoursago,
+    appointment24hoursago: schedule.appointment24Hoursago,
     appointment2Hoursago: schedule.appointment2Hoursago,
+    appointment2hoursago: schedule.appointment2Hoursago,
+    cancelEmailTrigger: triggers.cancelEmailTrigger,
+    rescheduleEmailTrigger: triggers.rescheduleEmailTrigger,
+    quoteApprovedEmailTrigger:
+      triggers.quoteApprovedEmailTrigger === 'Yes' || triggers.rescheduleEmailTrigger === 'Yes'
+        ? 'Yes'
+        : 'No',
   };
 }
 
@@ -500,29 +867,59 @@ export async function backfillMissingAppointmentReminders(rows: RawItem[]): Prom
 
   return Promise.all(
     rows.map(async (row) => {
-      const hasFlag24 = row.appointment24Hoursago === 'Yes' || row.appointment24Hoursago === 'No';
-      const hasFlag2 = row.appointment2Hoursago === 'Yes' || row.appointment2Hoursago === 'No';
+      const flag24Val = row.appointment24Hoursago ?? row.appointment24hoursago;
+      const flag2Val = row.appointment2Hoursago ?? row.appointment2hoursago;
+      const date24Val = row.reminder24HDate ?? row.reminder24hDate;
+      const date2Val = row.reminder2HDate ?? row.reminder2hDate;
+      const hasFlag24 = flag24Val === 'Yes' || flag24Val === 'No';
+      const hasFlag2 = flag2Val === 'Yes' || flag2Val === 'No';
       const schedule = buildReminderSchedule({
         appointmentTimeDate: row.appointmentTimeDate,
         appointmentDate: row.appointmentDate,
         appointmentTime: row.appointmentTime24 || row.appointmentTime,
         bookingType: row.bookingType,
+        status: row.status,
+        clientTimeZone: row.clientTimeZone,
         referenceTimeMs: nowMs,
       });
 
-      const needsDate24 = Boolean(schedule.reminder24HDate) && !hasValidDateValue(row.reminder24HDate);
-      const needsDate2 = Boolean(schedule.reminder2HDate) && !hasValidDateValue(row.reminder2HDate);
+      const statusNorm = String(row.status ?? '').toLowerCase().trim();
+      const nonConfirmed = Boolean(statusNorm) && statusNorm !== 'confirmed';
+      const clearStale24 = nonConfirmed && flag24Val === 'Yes';
+      const clearStale2 = nonConfirmed && flag2Val === 'Yes';
+      const needsDate24 = Boolean(schedule.reminder24HDate) && !hasValidDateValue(date24Val);
+      const needsDate2 = Boolean(schedule.reminder2HDate) && !hasValidDateValue(date2Val);
 
-      if (hasFlag24 && hasFlag2 && !needsDate24 && !needsDate2) {
+      if (hasFlag24 && hasFlag2 && !clearStale24 && !clearStale2 && !needsDate24 && !needsDate2) {
         return row;
       }
 
+      const nextFlag24 = clearStale24
+        ? 'No'
+        : hasFlag24
+          ? flag24Val
+          : schedule.appointment24Hoursago;
+      const nextFlag2 = clearStale2
+        ? 'No'
+        : hasFlag2
+          ? flag2Val
+          : schedule.appointment2Hoursago;
+
       const patched: RawItem = {
         ...row,
-        ...(schedule.reminder24HDate ? { reminder24HDate: schedule.reminder24HDate } : {}),
-        ...(schedule.reminder2HDate ? { reminder2HDate: schedule.reminder2HDate } : {}),
-        appointment24Hoursago: hasFlag24 ? row.appointment24Hoursago : schedule.appointment24Hoursago,
-        appointment2Hoursago: hasFlag2 ? row.appointment2Hoursago : schedule.appointment2Hoursago,
+        ...(schedule.reminder24HDate
+          ? { reminder24HDate: schedule.reminder24HDate, reminder24hDate: schedule.reminder24HDate }
+          : {}),
+        ...(schedule.reminder2HDate
+          ? { reminder2HDate: schedule.reminder2HDate, reminder2hDate: schedule.reminder2HDate }
+          : {}),
+        appointment24Hoursago: nextFlag24,
+        appointment24hoursago: nextFlag24,
+        appointment2Hoursago: nextFlag2,
+        appointment2hoursago: nextFlag2,
+        cancelEmailTrigger: 'No',
+        rescheduleEmailTrigger: 'No',
+        quoteApprovedEmailTrigger: 'No',
       };
 
       if (typeof row._id === 'string' && row._id.trim()) {

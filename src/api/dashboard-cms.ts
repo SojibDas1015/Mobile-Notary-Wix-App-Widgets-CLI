@@ -4,6 +4,7 @@ import { auth } from '@wix/essentials';
 import {
   backfillMissingAppointmentReminders,
   resolveGoogleApiKeys,
+  resolveStripeSecretKey,
   withAppointmentReminders,
 } from '../server/notary-service';
 import {
@@ -126,12 +127,16 @@ export const POST: APIRoute = async ({ request }) => {
         settingsRows.find((r) => r.ID === 'dmn-settings-01' || r.settingsId === 'dmn-settings-01') ??
         settingsRows[0] ??
         {};
-      const keys = await resolveGoogleApiKeys(mapOwnerSettings(preferred));
+      const [keys, stripe] = await Promise.all([
+        resolveGoogleApiKeys(mapOwnerSettings(preferred)),
+        resolveStripeSecretKey(),
+      ]);
       return Response.json({
         success: true,
         hasPlacesKey: Boolean(keys.placesApiKey),
         hasRoutesKey: Boolean(keys.routesApiKey),
-        secretError: keys.secretError || '',
+        hasStripeKey: Boolean(stripe.stripeSecretKey),
+        secretError: keys.secretError || stripe.secretError || '',
       });
     }
 
@@ -146,10 +151,14 @@ export const POST: APIRoute = async ({ request }) => {
         settingsRows[0] ??
         {};
       const owner = mapOwnerSettings(preferred);
-      const keys = await resolveGoogleApiKeys(owner);
-      const pendingQuotes = bookings.filter(
-        (b) => String(b.status ?? '') === 'Pending Quote Approval',
-      ).length;
+      const [keys, stripe] = await Promise.all([
+        resolveGoogleApiKeys(owner),
+        resolveStripeSecretKey(),
+      ]);
+      const pendingQuotes = bookings.filter((b) => {
+        const st = String(b.status ?? '');
+        return st === 'Pending Quote Approval' || st === 'Pending Approval';
+      }).length;
       const activeServices = services.filter((s) => s.active !== false).length;
 
       return Response.json({
@@ -161,7 +170,8 @@ export const POST: APIRoute = async ({ request }) => {
         tripMode: owner.tripCalculationMode,
         hasPlacesKey: Boolean(keys.placesApiKey),
         hasRoutesKey: Boolean(keys.routesApiKey),
-        secretError: keys.secretError || '',
+        hasStripeKey: Boolean(stripe.stripeSecretKey),
+        secretError: keys.secretError || stripe.secretError || '',
       });
     }
 
@@ -178,6 +188,35 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (op === 'queryAll') {
       const list = await queryAllElevated(collectionId, sortField);
+      if (
+        collectionId === 'ServicesCatalog' &&
+        !list.some((r) => String(r.serviceId ?? '').trim() === 'virtual_hearing')
+      ) {
+        try {
+          const elevatedInsert = auth.elevate(items.insert);
+          const vhRow = await elevatedInsert('ServicesCatalog', {
+            title: 'Virtual Hearing Support',
+            Title: 'Virtual Hearing Support',
+            serviceId: 'virtual_hearing',
+            description:
+              'In-person oath administration, witness swearing-in, identity verification, and attestation for virtual court trials, depositions, and administrative hearings.',
+            basePrice: 35,
+            pricingModel: 'flat',
+            isQuoteOnly: false,
+            paymentPolicy: 'deposit_percent',
+            depositAmount: 50,
+            popularLabel: 'Court & Virtual',
+            imageUrl:
+              'https://images.pexels.com/photos/5668473/pexels-photo-5668473.jpeg?auto=compress&cs=tinysrgb&w=600',
+            hiddenByDefault: false,
+            sortOrder: 9,
+            active: true,
+          });
+          if (vhRow) list.push(vhRow as RawItem);
+        } catch {
+          // Non-blocking if ServicesCatalog insert is restricted.
+        }
+      }
       const result =
         collectionId === 'AppointmentsAndQuotes'
           ? await backfillMissingAppointmentReminders(list)
@@ -205,20 +244,37 @@ export const POST: APIRoute = async ({ request }) => {
         const existing = (await elevatedGet(collectionId, itemId).catch(() => undefined)) as
           | RawItem
           | undefined;
-        const merged = {
+        const merged: RawItem = {
           ...existing,
           ...item,
           _id: itemId,
         };
         const toUpdate =
           collectionId === 'AppointmentsAndQuotes'
-            ? withAppointmentReminders(merged)
+            ? withAppointmentReminders(merged, Date.now(), { existing })
             : merged;
         const elevatedUpdate = auth.elevate(items.update);
         const updated = await elevatedUpdate(collectionId, {
           ...toUpdate,
           _id: itemId,
         });
+        if (
+          collectionId === 'AppointmentsAndQuotes' &&
+          (toUpdate.cancelEmailTrigger === 'Yes' ||
+            toUpdate.rescheduleEmailTrigger === 'Yes' ||
+            toUpdate.quoteApprovedEmailTrigger === 'Yes')
+        ) {
+          setTimeout(() => {
+            void elevatedUpdate(collectionId, {
+              ...updated,
+              ...toUpdate,
+              _id: itemId,
+              cancelEmailTrigger: 'No',
+              rescheduleEmailTrigger: 'No',
+              quoteApprovedEmailTrigger: 'No',
+            }).catch(() => undefined);
+          }, 4000);
+        }
         return Response.json({ success: true, item: updated });
       }
 

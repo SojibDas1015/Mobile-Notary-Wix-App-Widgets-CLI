@@ -12,6 +12,7 @@ export const COLLECTION_IDS = {
 export type BookingType = 'instant' | 'quote';
 
 export type BookingStatus =
+  | 'Pending Approval'
   | 'Confirmed'
   | 'Pending Quote Approval'
   | 'Quote Sent'
@@ -21,6 +22,13 @@ export type BookingStatus =
 export type TripCalculationMode = 'one-way' | 'round-trip';
 
 export type PricingModel = 'per_signature' | 'flat' | 'quote_only';
+
+export type PaymentPolicy =
+  | 'optional_online'
+  | 'full_advance'
+  | 'deposit_fixed'
+  | 'deposit_percent'
+  | 'pay_at_appointment';
 
 export type QuestionInputType =
   | 'text'
@@ -93,6 +101,11 @@ export interface BookingRecord {
   grandTotal?: number;
   selectedAddons?: string;
   paymentPreference?: string;
+  paymentStatus?: string;
+  amountPaid?: number;
+  balanceDue?: number;
+  stripeSessionId?: string;
+  stripePaymentIntentId?: string;
   specialInstructions?: string;
   serviceSpecificDetails?: string;
   idVerifiedConfirmed?: boolean;
@@ -107,6 +120,8 @@ export interface ServiceRecord {
   basePrice: number;
   pricingModel: PricingModel;
   isQuoteOnly: boolean;
+  paymentPolicy?: PaymentPolicy;
+  depositAmount?: number;
   popularLabel?: string;
   imageUrl?: string;
   hiddenByDefault: boolean;
@@ -175,6 +190,9 @@ export interface OwnerSettingsRecord {
   perMileRate: number;
   tripCalculationMode: TripCalculationMode;
   enableRonService: boolean;
+  enableIpenService?: boolean;
+  defaultDepositPercent?: number;
+  depositPolicyText?: string;
   businessName: string;
   businessPhone: string;
   receiptDisclaimer: string;

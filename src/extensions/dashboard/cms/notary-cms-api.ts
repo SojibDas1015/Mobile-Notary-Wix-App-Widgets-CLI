@@ -84,6 +84,7 @@ async function saveRaw(collectionId: string, item: RawItem): Promise<RawItem> {
 export interface SecretStatusResult {
   hasPlacesKey: boolean;
   hasRoutesKey: boolean;
+  hasStripeKey: boolean;
   secretError: string;
 }
 
@@ -261,6 +262,8 @@ export async function saveService(draft: Partial<ServiceRecord> & { _id?: string
     basePrice: Number(draft.basePrice ?? 0),
     pricingModel,
     isQuoteOnly,
+    paymentPolicy: isQuoteOnly ? 'pay_at_appointment' : draft.paymentPolicy ?? 'deposit_percent',
+    depositAmount: Number(draft.depositAmount ?? (isQuoteOnly ? 0 : 50)),
     sortOrder: Number(draft.sortOrder ?? 100),
     active: draft.active !== false,
     hiddenByDefault: Boolean(draft.hiddenByDefault),
@@ -423,6 +426,12 @@ export async function saveOwnerSettings(settings: OwnerSettingsRecord): Promise<
     perMileRate: Number(settings.perMileRate ?? 0),
     tripCalculationMode: settings.tripCalculationMode === 'round-trip' ? 'round-trip' : 'one-way',
     enableRonService: Boolean(settings.enableRonService),
+    enableIpenService: Boolean(settings.enableIpenService),
+    defaultDepositPercent: Math.max(
+      0,
+      Math.min(100, Number(settings.defaultDepositPercent ?? 50)),
+    ),
+    depositPolicyText: (settings.depositPolicyText ?? '').trim(),
     googlePlacesApiKey: (settings.googlePlacesApiKey ?? '').trim(),
     googleRoutesApiKey: (settings.googleRoutesApiKey ?? '').trim(),
   };

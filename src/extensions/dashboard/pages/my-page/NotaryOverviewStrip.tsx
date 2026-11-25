@@ -31,7 +31,7 @@ export const NotaryOverviewStrip = () => {
       </div>
 
       <div className="dmn-kpi-card">
-        <span className="dmn-kpi-label">Pending Quote Approval</span>
+        <span className="dmn-kpi-label">Pending Owner Approval</span>
         <span className="dmn-kpi-value">{overview.pendingQuotes}</span>
         <Box paddingTop="3px">
           <Badge size="tiny" skin={overview.pendingQuotes > 0 ? 'warning' : 'success'}>

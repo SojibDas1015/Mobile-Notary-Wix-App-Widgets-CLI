@@ -121,8 +121,9 @@ export const QuestionsCollectionPage = () => {
         primaryAction={<PrimaryActions label="Add question" onClick={openNew} />}
       />
       <CollectionPage.Content>
-        <Table
-          state={state}
+        <div className="dmn-responsive-table dmn-table-2col">
+          <Table
+            state={state}
           horizontalScroll
           search={<CollectionSearch placeholder="Search label, fieldKey, or serviceId" />}
           filters={
@@ -181,7 +182,7 @@ export const QuestionsCollectionPage = () => {
               width: '260px',
               render: (item) => (
                 <Box direction="vertical" gap="3px">
-                  <Box gap="SP1" verticalAlign="middle">
+                  <Box gap="SP1" verticalAlign="middle" flexWrap="wrap">
                     <Text size="small" weight="bold">
                       {item.label || item.title}
                     </Text>
@@ -203,7 +204,17 @@ export const QuestionsCollectionPage = () => {
               title: 'Service Scope',
               width: '190px',
               render: (item) => (
-                <Text size="small">{serviceNameById[item.serviceId] ?? item.serviceId}</Text>
+                <Box direction="vertical" gap="3px">
+                  <Text size="small">{serviceNameById[item.serviceId] ?? item.serviceId}</Text>
+                  <div className="dmn-mobile-row-meta">
+                    <Text size="tiny" secondary>
+                      {INPUT_TYPE_LABELS[item.inputType] ?? item.inputType}
+                    </Text>
+                    <Badge size="tiny" skin={item.active ? 'success' : 'neutral'}>
+                      {item.active ? 'Active' : 'Hidden'}
+                    </Badge>
+                  </div>
+                </Box>
               ),
               mobile: { column: 'second' },
             },
@@ -252,6 +263,7 @@ export const QuestionsCollectionPage = () => {
             },
           ]}
         />
+        </div>
       </CollectionPage.Content>
     </CollectionPage>
   );

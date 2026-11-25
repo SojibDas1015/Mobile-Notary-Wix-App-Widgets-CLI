@@ -6,6 +6,7 @@ import type {
   DayKey,
   FeeType,
   OwnerSettingsRecord,
+  PaymentPolicy,
   PricingModel,
   QuestionInputType,
   QuestionRecord,
@@ -68,6 +69,25 @@ export function normalizePricingModel(val: unknown, isQuoteOnly: boolean): Prici
   const s = asString(val);
   if (s === 'per_signature' || s === 'flat' || s === 'quote_only') return s;
   return isQuoteOnly ? 'quote_only' : 'flat';
+}
+
+export const DEFAULT_DEPOSIT_PERCENT = 50;
+
+export const DEFAULT_DEPOSIT_POLICY_TEXT =
+  'A 50% non-refundable deposit is required to secure and officially confirm your appointment (subject to North Carolina notary fee regulations) and is applied directly toward your total service cost. The remaining 50% balance is due at the time of service. Deposits are non-refundable for customer cancellations or no-shows where legally permitted. If Direct Mobile Notary & Verification Services cancels the appointment, your deposit will be refunded in full.';
+
+export function normalizePaymentPolicy(val: unknown): PaymentPolicy {
+  const s = asString(val);
+  if (
+    s === 'optional_online' ||
+    s === 'full_advance' ||
+    s === 'deposit_fixed' ||
+    s === 'deposit_percent' ||
+    s === 'pay_at_appointment'
+  ) {
+    return s;
+  }
+  return 'deposit_percent';
 }
 
 export function normalizeFeeType(val: unknown): FeeType {
@@ -163,7 +183,7 @@ export function mapBooking(raw: RawItem): BookingRecord {
     serviceName: asString(raw.serviceName),
     serviceId: asString(raw.serviceId),
     bookingType,
-    status: asString(raw.status, bookingType === 'quote' ? 'Pending Quote Approval' : 'Confirmed'),
+    status: asString(raw.status, bookingType === 'quote' ? 'Pending Quote Approval' : 'Pending Approval'),
     clientName: asString(raw.clientName),
     clientPhone: asString(raw.clientPhone),
     clientEmail: asString(raw.clientEmail),
@@ -182,10 +202,10 @@ export function mapBooking(raw: RawItem): BookingRecord {
     appointmentDate: asString(raw.appointmentDate),
     appointmentTime: asString(raw.appointmentTime),
     appointmentTimeDate: raw.appointmentTimeDate as string | Date | undefined,
-    reminder24HDate: raw.reminder24HDate as string | Date | undefined,
-    reminder2HDate: raw.reminder2HDate as string | Date | undefined,
-    appointment24Hoursago: asString(raw.appointment24Hoursago),
-    appointment2Hoursago: asString(raw.appointment2Hoursago),
+    reminder24HDate: (raw.reminder24HDate ?? raw.reminder24hDate) as string | Date | undefined,
+    reminder2HDate: (raw.reminder2HDate ?? raw.reminder2hDate) as string | Date | undefined,
+    appointment24Hoursago: asString(raw.appointment24Hoursago ?? raw.appointment24hoursago),
+    appointment2Hoursago: asString(raw.appointment2Hoursago ?? raw.appointment2hoursago),
     signersCount: asNumber(raw.signersCount, 1),
     notarizedSignatures: asNumber(raw.notarizedSignatures, 0),
     pageCount: asNumber(raw.pageCount, 0),
@@ -201,6 +221,11 @@ export function mapBooking(raw: RawItem): BookingRecord {
     grandTotal: asNumber(raw.grandTotal, 0),
     selectedAddons: asString(raw.selectedAddons),
     paymentPreference: asString(raw.paymentPreference),
+    paymentStatus: asString(raw.paymentStatus),
+    amountPaid: raw.amountPaid != null ? asNumber(raw.amountPaid, 0) : undefined,
+    balanceDue: raw.balanceDue != null ? asNumber(raw.balanceDue, 0) : undefined,
+    stripeSessionId: asString(raw.stripeSessionId),
+    stripePaymentIntentId: asString(raw.stripePaymentIntentId),
     specialInstructions: asString(raw.specialInstructions),
     serviceSpecificDetails: asString(raw.serviceSpecificDetails),
     idVerifiedConfirmed: asBool(raw.idVerifiedConfirmed, false),
@@ -210,6 +235,21 @@ export function mapBooking(raw: RawItem): BookingRecord {
 
 export function mapService(raw: RawItem): ServiceRecord {
   const isQuoteOnly = asBool(raw.isQuoteOnly, false);
+  const rawPolicy = asString(raw.paymentPolicy);
+  const paymentPolicy: PaymentPolicy = isQuoteOnly
+    ? 'pay_at_appointment'
+    : rawPolicy === 'deposit_fixed' || rawPolicy === 'pay_at_appointment' || rawPolicy === 'full_advance' || rawPolicy === 'optional_online'
+      ? (rawPolicy as PaymentPolicy)
+      : 'deposit_percent';
+  const rawDeposit = asNumber(raw.depositAmount, 0);
+  const depositAmount =
+    isQuoteOnly
+      ? 0
+      : paymentPolicy === 'deposit_percent'
+        ? rawDeposit > 0
+          ? rawDeposit
+          : DEFAULT_DEPOSIT_PERCENT
+        : rawDeposit;
   return {
     _id: asString(raw._id),
     title: asString(raw.title ?? raw.Title),
@@ -218,6 +258,8 @@ export function mapService(raw: RawItem): ServiceRecord {
     basePrice: asNumber(raw.basePrice, 0),
     pricingModel: normalizePricingModel(raw.pricingModel, isQuoteOnly),
     isQuoteOnly,
+    paymentPolicy,
+    depositAmount,
     popularLabel: asString(raw.popularLabel),
     imageUrl: asString(raw.imageUrl),
     hiddenByDefault: asBool(raw.hiddenByDefault, false),
@@ -306,6 +348,12 @@ export function mapOwnerSettings(raw: RawItem): OwnerSettingsRecord {
     perMileRate: asNumber(raw.perMileRate, 0),
     tripCalculationMode: normalizeTripMode(raw.tripCalculationMode),
     enableRonService: asBool(raw.enableRonService, false),
+    enableIpenService: asBool(raw.enableIpenService, false),
+    defaultDepositPercent: Math.max(
+      0,
+      Math.min(100, asNumber(raw.defaultDepositPercent, DEFAULT_DEPOSIT_PERCENT)),
+    ),
+    depositPolicyText: asString(raw.depositPolicyText, DEFAULT_DEPOSIT_POLICY_TEXT),
     businessName: asString(raw.businessName),
     businessPhone: asString(raw.businessPhone),
     receiptDisclaimer: asString(raw.receiptDisclaimer),
